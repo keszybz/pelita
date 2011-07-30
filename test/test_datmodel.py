@@ -380,6 +380,14 @@ class TestCTFUniverse(unittest.TestCase):
         self.assertEqual([universe.bots[2]], universe.team_bots(0))
         self.assertEqual([universe.bots[3]], universe.team_bots(1))
 
+        self.assertEqual(universe.maze, universe._backup[0])
+        self.assertEqual(universe.teams, universe._backup[1])
+        self.assertEqual(universe.bots, universe._backup[2])
+
+        self.assertFalse(universe.maze is universe._backup[0])
+        self.assertFalse(universe.teams is universe._backup[1])
+        self.assertFalse(universe.bots is universe._backup[2])
+
         odd_layout = (
             """ #####
                 #0 1#
@@ -689,6 +697,7 @@ class TestCTFUniverseRules(unittest.TestCase):
         # a closure here to quickly generate a target universe to compare to.
         # Also we adapt the score, in case food has been eaten
 
+
         def create_TestUniverse(layout):
             initial_pos = [(1, 1), (4, 2)]
             universe = create_CTFUniverse(layout, number_bots)
@@ -698,6 +707,7 @@ class TestCTFUniverseRules(unittest.TestCase):
                 universe.teams[1]._score_point()
             if not universe.maze.has_at(Food, (3, 1)):
                 universe.teams[0]._score_point()
+            universe._backup = backup_target
             return universe
 
         test_start = (
@@ -706,12 +716,15 @@ class TestCTFUniverseRules(unittest.TestCase):
                 #.  1#
                 ###### """)
         universe = create_CTFUniverse(test_start, number_bots)
+        backup_target = universe._backup
+        backup = universe.copy()
         events = universe.move_bot(1, west)
         test_first_move = (
             """ ######
                 #0 . #
                 #. 1 #
                 ###### """)
+
         self.assertEqual(create_TestUniverse(test_first_move), universe)
         self.assertTALEqualList(events, [BotMoves(1, (4, 2), (3, 2))])
         test_second_move = (
@@ -766,6 +779,10 @@ class TestCTFUniverseRules(unittest.TestCase):
         self.assertEqual(create_TestUniverse(test_bot_suicide), universe)
         self.assertTALEqualList(events, [BotMoves(0, (4, 1), (4, 2)),
             BotDestroyed(0, (4, 1), (4, 2), (1, 1), 1, (4, 2), (4, 2))])
+
+        # now test the big bang theory, Mr. Cooper
+        universe.big_bang()
+        self.assertEqual(universe, backup)
 
     def test_no_eat_own_food(self):
         test_start = (

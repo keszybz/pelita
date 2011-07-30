@@ -68,10 +68,15 @@ class TestGame(unittest.TestCase):
                 universe.teams[1]._score_point()
             if not universe.maze.has_at(Food, (3, 1)):
                 universe.teams[0]._score_point()
+            universe._backup = backup_target
             return universe
 
 
         gm = GameMaster(test_start, number_bots, 200)
+
+        backup_target = gm.universe._backup
+        backup = gm.universe.copy()
+
         gm.register_player(TestPlayer([east, east, east, south, stop, east]))
         gm.register_player(TestPlayer([west, west, west, stop, west, west]))
 
@@ -125,6 +130,8 @@ class TestGame(unittest.TestCase):
                 ###### """)
         self.assertEqual(create_TestUniverse(test_sixth_round), gm.universe)
 
+        gm.universe.big_bang()
+        self.assertEqual(backup, gm.universe)
 
         # now play the full game
         gm = GameMaster(test_start, number_bots, 200)
@@ -137,6 +144,10 @@ class TestGame(unittest.TestCase):
                 #.1  #
                 ###### """)
         self.assertEqual(create_TestUniverse(test_sixth_round), gm.universe)
+
+        # here we test big bang works more than once
+        gm.universe.big_bang()
+        self.assertEqual(backup, gm.universe)
 
     def test_malicous_player(self):
         free_obj = Free()
@@ -206,7 +217,6 @@ class TestGame(unittest.TestCase):
             def observe(self, round_, turn, universe, events):
                 # universe should not have been altered
                 test_self.assertEqual(original_universe, gm.universe)
-                
                 # there should only be a botmoves event
                 test_self.assertEqual(len(events), 1)
                 test_self.assertTrue(BotMoves in events)
@@ -217,5 +227,4 @@ class TestGame(unittest.TestCase):
         gm.play_round(0)
 
         self.assertEqual(original_universe, gm.universe)
-
 

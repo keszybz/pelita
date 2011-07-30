@@ -699,6 +699,15 @@ class CTFUniverse(object):
         # TODO make a deepcopy here, so that we can big_bang
         self.teams = teams
         self.bots = bots
+        self._create_backup()
+
+    def big_bang(self):
+        self.maze, self.teams, self.bots = self._backup
+        self._create_backup()
+
+    def _create_backup(self):
+        self._backup = [copy.deepcopy(i)
+                for i in (self.maze, self.teams, self.bots)]
 
     @property
     def bot_positions(self):

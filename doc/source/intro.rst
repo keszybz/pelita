@@ -163,6 +163,35 @@ You can create a clone with::
 
     $ git clone git://github.com/Debilski/pelita.git
 
+Internals
+=========
+
+The following `sequence diagram
+<http://en.wikipedia.org/wiki/Sequence_diagram>`_ shows how the different
+instances communicate with each other during the game.
+
+.. figure:: images/sequence_diagram1.png
+   :alt: Basic control flow
+
+   Basic control flow
+
+The diagram shows the ``GameMaster`` instance ``game_master`` which essentially
+coordinates the control flow. It contains references to the ``Universe``
+instance ``universe``, the two players of type ``StoppingPlayer`` and
+``RandomPlayer`` which are stored in the ``players`` list in the ``game_master``
+and lastly an ``AsciiViewer`` to display the course of the game.  Here we just
+show two players, although more than that are of course possible.  The basic
+flow of events is as follows: first the ``game_master`` calls
+``get_move(universe)`` on a player, e.g.  ``players[0]``, which then returns a
+move, for example ``east`` (``(1, 0)``). This move is then forwarded to the
+``universe`` using ``move_bot(bot_id, move)``  which calculates how this move
+changes the game state and returns a list of ``events`` of type ``UniverseEvent``.
+Lastly the current state of the ``universe`` and the ``events`` are
+forwarded to the ``AsciiViewer`` using ``observe(universe, events)`` which then
+displays the state change accordingly. The ``game_master`` will repeat this
+sequence of calls for each player until the ``events`` returned by the
+``universe`` contain a ``TeamWins`` event.
+
 Project-Wall
 ============
 

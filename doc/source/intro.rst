@@ -166,6 +166,15 @@ You can create a clone with::
 Internals
 =========
 
+The following `class diagram <http://en.wikipedia.org/wiki/Class_diagram>`_
+shows the static structure of the underlying datamodel.
+
+.. figure:: images/class_diagram.png
+   :alt: Static structure
+
+   Static structure
+
+
 The following `sequence diagram
 <http://en.wikipedia.org/wiki/Sequence_diagram>`_ shows how the different
 instances communicate with each other during the game.

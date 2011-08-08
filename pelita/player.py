@@ -341,4 +341,8 @@ class BFSPlayer(AbstractPlayer):
         if not self.current_path:
             self.current_path = self.bfs_food()
         new_pos = self.current_path.pop()
-        return diff_pos(self.current_pos, new_pos)
+        try:
+            return diff_pos(self.current_pos, new_pos)
+        except ValueError:
+            self.current_path = None
+            return self.get_move()

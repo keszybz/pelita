@@ -122,6 +122,13 @@ class ServerActor(DispatchingActor):
         self.game_master = None
 
     @expose
+    def get_teams(self, message):
+        """ Returns the available teams.
+        """
+        teams = list(self.team_names)
+        self.ref.reply(teams)
+
+    @expose
     def initialize_game(self, message, layout, number_bots, game_time):
         self.game_master = GameMaster(layout, number_bots, game_time)
 

@@ -8,9 +8,18 @@ from pelita.utils.colorama_wrapper import colorama
 FORMAT = '[%(asctime)s,%(msecs)03d][%(name)s][%(levelname)s][%(funcName)s]' + colorama.Fore.MAGENTA + ' %(message)s' + colorama.Fore.RESET
 #logging.basicConfig(format=FORMAT, datefmt="%H:%M:%S", level=logging.WARNING)
 
+import random
+import time
+
+class SlowBFSPlayer(BFSPlayer):
+    def get_move(self):
+        move = super(SlowBFSPlayer, self).get_move()
+        #if random.randint(0, 18) == 7:
+        time.sleep(2)
+        return move
 
 clientActor = ClientActor("the good ones")
-clientActor.register_team(SimpleTeam(BFSPlayer(), BFSPlayer()))
+clientActor.register_team(SimpleTeam(BFSPlayer(), SlowBFSPlayer()))
 clientActor.connect("pelita-main", host="", port=50007)
 
 clientActor2 = ClientActor("the bad ones")

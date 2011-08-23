@@ -61,7 +61,9 @@ class JsonSocketConnection(object):
     def send(self, obj):
         """ Converts `obj` to a json string and sends it.
         """
+        import time
         if self.socket:
+            print "before sent", time.time()
             json_string = json_converter.dumps(obj)
             self._send(json_string)
         else:
@@ -91,9 +93,11 @@ class JsonSocketConnection(object):
 
         # get the first element
         data = self.buffer.pop(0)
+        import time
         try:
             json_data = json_converter.loads(data)
             _logger.debug("Data read %r", json_data)
+            print "read and converted", time.time()
         except ValueError:
             _logger.warning("Could not decode data %r", data)
             raise

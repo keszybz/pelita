@@ -31,13 +31,16 @@ class AsciiViewer(AbstractViewer):
     def __init__(self):
         self.time = time.time()
         self.last = None
-        self.thefile = open("saveddata-norandom-nonoise2", "w")
+        self.thefile = open("saveddata-huge-10-nonet", "w")
+        self.data = ""
 
     def observe(self, round_, turn, universe, events):
         if self.last:
-            self.thefile.write(str(time.time() - self.time) + " ")
-            self.thefile.write(str(time.time() - self.last) + "\n")
+            self.data += (str(time.time() - self.time) + " ")
+            self.data += (str(time.time() - self.last) + "\n")
             if round_ == 29:
+                self.thefile.write(self.data)
+                self.data = ""
                 self.thefile.flush()
 
         self.last = time.time()

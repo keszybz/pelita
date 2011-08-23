@@ -303,6 +303,8 @@ class RemoteActorReference(BaseActorReference):
         remote_name = self.remote_name
         sender_info = repr(channel) # only used for debugging
 
+        import time
+        print "Put into remote mailbox", time.time()
         if channel:
             # We’ve been given a channel to reply to (either an ActorReference
             # or a Request). Store a reference to the channel and send an uuid

@@ -201,7 +201,7 @@ class ServerActor(DispatchingActor):
     def initialize_game(self, message, layout, number_bots, game_time):
         """ Initialises a new game.
         """
-        self.game_master = GameMaster(layout, number_bots, game_time)
+        self.game_master = GameMaster(layout, number_bots, game_time, noise=False)
         self.check_for_start()
 
     def _remove_dead_teams(self):

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import traceback
-import threading as _threading
+import multiprocessing as _threading
 import logging
 
 _logger = logging.getLogger("pelita.threading")
@@ -9,6 +9,7 @@ _logger = logging.getLogger("pelita.threading")
 
 __docformat__ = "restructuredtext"
 
+manager = _threading.Manager()
 
 class CloseThread(Exception):
     """May be raised from inside the _run method to close the thread."""
@@ -18,7 +19,7 @@ class SuspendableThread(object):
     def __init__(self):
         # get a (unique?) name for the thread
         # we add the class name, so we know who started the thread
-        self._thread = _threading.Thread(target=self.run, name=_newname(self.__class__))
+        self._thread = _threading.Process(target=self.run, name=_newname(self.__class__))
         self._running = False
 
         # Define a special event which can be flagged to wait.

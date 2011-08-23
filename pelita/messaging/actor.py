@@ -4,12 +4,14 @@
 General and local actor definitions.
 """
 
-
-import Queue
+import Queue as _Queue
 import logging
 import uuid
 import inspect
-from threading import Lock
+from multiprocessing import Lock
+from multiprocessing import Queue as mQueue
+
+from pelita.utils.threading_helpers import manager
 
 from pelita.utils import SuspendableThread, CloseThread
 
@@ -45,7 +47,7 @@ class Request(Channel):
     The `Actor` may then reply to the `Request` exactly once.
     """
     def __init__(self):
-        self._queue = Queue.Queue(maxsize=1)
+        self._queue = manager.Queue(maxsize=1)
 
     def put(self, message, sender=None, remote=None):
         """ Sets the result of the Request to `message`.
@@ -75,7 +77,7 @@ class Request(Channel):
         """Returns the result or None, if the value is not available."""
         try:
             return self._queue.get(timeout).result
-        except Queue.Empty:
+        except _Queue.Empty:
             return None
 
     def has_result(self):
@@ -135,7 +137,7 @@ class BaseActor(SuspendableThread):
         """
         try:
             message, sender, priority, remote = self.handle_inbox()
-        except Queue.Empty:
+        except _Queue.Empty:
             return
 
         if isinstance(message, Exit):
@@ -204,7 +206,7 @@ class BaseActor(SuspendableThread):
 class Actor(BaseActor):
     # TODO Handle messages not replied to – else the queue is waiting forever
     def __init__(self, inbox=None, **kwargs):
-        self._inbox = inbox or Queue.Queue()
+        self._inbox = inbox or manager.Queue()
 
         super(Actor, self).__init__(**kwargs)
 
@@ -354,7 +356,7 @@ class ActorReference(BaseActorReference):
         self._actor.start()
 
     def stop(self):
-        self._actor.put(StopProcessing)
+        pass#self._actor.put(StopProcessing)
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__, self._actor)

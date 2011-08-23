@@ -3,11 +3,13 @@
 """
 Remote actor setup and bookkeeping of remote requests.
 """
-
-import Queue
+import Queue as _Queue
 import socket
 import weakref
-from threading import Lock, RLock
+from multiprocessing import Lock, RLock
+from multiprocessing import Queue as mQueue
+
+from pelita.utils.threading_helpers import manager
 
 import logging
 _logger = logging.getLogger("pelita.mailbox")
@@ -119,7 +121,7 @@ class RemoteOutbox(SuspendableThread):
         self.mailbox = mailbox
         self.connection = mailbox.connection
         self.request_db = mailbox.request_db
-        self._queue = Queue.Queue()
+        self._queue = manager.Queue()
 
     def _run(self):
         self.handle_outbox()
@@ -137,7 +139,7 @@ class RemoteOutbox(SuspendableThread):
 
             self.connection.send(to_send)
             print "Read and processed outbox", time.time()
-        except Queue.Empty:
+        except _Queue.Empty:
             pass
 
     def put(self, msg):

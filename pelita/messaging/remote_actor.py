@@ -125,14 +125,18 @@ class RemoteOutbox(SuspendableThread):
         self.handle_outbox()
 
     def handle_outbox(self):
+        import time
         try:
+            print "Trying to read outbox", time.time()
             to_send = self._queue.get(True, 3)
+            print "Found something", time.time()
 
             _logger.info("Processing outbox %r", to_send)
             if to_send is StopProcessing:
                 raise CloseThread
 
             self.connection.send(to_send)
+            print "Read and processed outbox", time.time()
         except Queue.Empty:
             pass
 

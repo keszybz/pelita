@@ -36,17 +36,20 @@ class AsciiViewer(AbstractViewer):
 
     def observe(self, round_, turn, universe, events):
         if self.last:
+            diff = time.time() - self.last
             self.data += (str(time.time() - self.time) + " ")
-            self.data += (str(time.time() - self.last) + "\n")
+            self.data += (str(diff) + "\n")
             if round_ == 29:
                 self.thefile.write(self.data)
                 self.data = ""
                 self.thefile.flush()
+        else:
+            diff = 0.0
 
         self.last = time.time()
 
-        print ("Round: %i Turn: %i Score: %i:%i"
-        % (round_, turn, universe.teams[0].score, universe.teams[1].score))
+        print ("%e: Round: %i Turn: %i Score: %i:%i"
+        % (diff, round_, turn, universe.teams[0].score, universe.teams[1].score))
         print ("Events: %r" % [str(e) for e in events])
         print universe.compact_str
         if datamodel.TeamWins in events:

@@ -6,6 +6,7 @@ General and local actor definitions.
 
 
 import Queue
+import copy
 import logging
 import uuid
 import inspect
@@ -295,8 +296,9 @@ class ActorReference(BaseActorReference):
         """
         if not self.is_running:
             raise ActorNotRunning("Actor '%r' not running." % self._actor)
+
         _logger.debug("Putting '%r' into '%r' (channel: %r)" % (message, self._actor, channel))
-        self._actor.put(message, channel, remote)
+        self._actor.put(copy.deepcopy(message), channel, remote)
 
     def link(self, other):
         """ Links this actor to another actor and vice versa.

@@ -134,6 +134,36 @@ class TestDispatchingActor(unittest.TestCase):
         actor.stop()
         actor.join()
 
+    def test_actor_autocopy(self):
+        actor = actor_of(Dispatcher)
+        self.assertRaises(ActorNotRunning, actor.notify, "dummy")
+        actor.start()
+
+        # generate a mutable reference
+        mutable_reference = [12]
+
+        # pause the actor
+        actor._actor.thread.paused = True
+
+        # pass the reference (which won't be processed yet)
+        actor.notify("set_param1", [mutable_reference])
+
+        # change the reference
+        mutable_reference[0] = 13
+
+        # we unpause the thread
+        actor._actor.thread.paused = False
+
+        request = actor.query("get_param1")
+        response = request.get()
+
+        # response must be equal to *original* value
+        self.assertEqual(response, [12])
+        self.assertNotEqual(response, mutable_reference)
+
+        actor.stop()
+        actor.join()
+
 class RaisingActor(Actor):
     def on_receive(self, message):
         raise NotImplementedError

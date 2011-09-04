@@ -134,6 +134,28 @@ class TestDispatchingActor(unittest.TestCase):
         actor.stop()
         actor.join()
 
+    def test_message_must_be_copyable(self):
+        actor = actor_of(Dispatcher)
+        actor.start()
+
+        class Uncopyable(object):
+            def __deepcopy__(self, memo):
+                raise TypeError()
+
+        obj = Uncopyable()
+
+        self.assertRaises(ValueError, actor.notify, "dummy", [obj])
+        self.assertRaises(ValueError, actor.put, obj)
+
+        # should not raise but trigger unhandled
+        req = Request()
+        actor.put_raw(obj, req)
+
+        self.assertEqual(type(req.get()), str)
+
+        actor.stop()
+        actor.join()
+
     def test_actor_autocopy(self):
         actor = actor_of(Dispatcher)
         self.assertRaises(ActorNotRunning, actor.notify, "dummy")
@@ -160,6 +182,39 @@ class TestDispatchingActor(unittest.TestCase):
         # response must be equal to *original* value
         self.assertEqual(response, [12])
         self.assertNotEqual(response, mutable_reference)
+
+        actor.stop()
+        actor.join()
+
+    def test_actor_no_autocopy(self):
+        actor = actor_of(Dispatcher)
+        self.assertRaises(ActorNotRunning, actor.notify, "dummy")
+        actor.start()
+
+        # generate a mutable reference
+        mutable_reference = [12]
+
+        # pause the actor
+        actor._actor.thread.paused = True
+
+        # pass the reference (which won't be processed yet)
+        raw_msg = {"method": "set_param1",
+                   "params": [mutable_reference]}
+        actor.put_raw(raw_msg)
+
+        # change the reference
+        mutable_reference[0] = 13
+
+        # we unpause the thread
+        actor._actor.thread.paused = False
+
+        request = actor.query("get_param1")
+        response = request.get()
+
+        # response must be equal to *changed* value
+        self.assertNotEqual(response, [12])
+        self.assertEqual(response, mutable_reference)
+        self.assertEqual(response, [13])
 
         actor.stop()
         actor.join()

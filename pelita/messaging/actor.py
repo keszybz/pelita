@@ -104,6 +104,9 @@ class Exit(object):
         self.sender = sender
         self.reason = reason
 
+    def __repr__(self):
+        return "Exit(%r, %r)" % (self.sender, self.reason)
+
 class BaseActor(SuspendableThread):
     """ BaseActor is an actor with no pre-defined queue.
     """
@@ -161,7 +164,7 @@ class BaseActor(SuspendableThread):
             self.ref._channel = None
             self.ref._remote = None
         except Exception as e:
-            exit_msg = Exit(self, e)
+            exit_msg = Exit(self.ref, e)
             self._exit_linked(exit_msg)
             raise
 

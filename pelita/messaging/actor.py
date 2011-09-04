@@ -174,7 +174,7 @@ class BaseActor(SuspendableThread):
         while self._linked_actors:
             linked = self._linked_actors[0]
             self.ref.unlink(linked)
-            linked.put(exit_msg)
+            linked.put_raw(exit_msg)
 
     def on_start(self):
         """
@@ -295,13 +295,27 @@ class ActorReference(BaseActorReference):
         super(ActorReference, self).__init__(**kwargs)
 
     def put(self, message, channel=None, remote=None):
-        """ Puts a raw value into the actor’s inbox
+        """ Puts a value into the actor’s inbox
         """
         if not self.is_running:
             raise ActorNotRunning("Actor '%r' not running." % self._actor)
 
         _logger.debug("Putting '%r' into '%r' (channel: %r)" % (message, self._actor, channel))
-        self._actor.put(copy.deepcopy(message), channel, remote)
+
+        try:
+            copied_message = copy.deepcopy(message)
+        except TypeError:
+            raise ValueError("%r cannot be copied." % message)
+        self._actor.put(copied_message, channel, remote)
+
+    def put_raw(self, message, channel=None, remote=None):
+        """ Puts a raw value into the actor’s inbox without copying
+        """
+        if not self.is_running:
+            raise ActorNotRunning("Actor '%r' not running." % self._actor)
+        _logger.debug("Putting raw '%r' into '%r' (channel: %r)" % (message, self._actor, channel))
+
+        self._actor.put(message, channel, remote)
 
     def link(self, other):
         """ Links this actor to another actor and vice versa.
@@ -359,7 +373,10 @@ class ActorReference(BaseActorReference):
         self._actor.start()
 
     def stop(self):
-        self._actor.put(StopProcessing)
+        try:
+            self.put_raw(StopProcessing)
+        except ActorNotRunning:
+            pass
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__, self._actor)

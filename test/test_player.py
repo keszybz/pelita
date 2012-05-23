@@ -51,6 +51,11 @@ class TestAbstractPlayer(unittest.TestCase):
         self.assertEqual(universe.teams[1], player_1.team)
         self.assertEqual(universe.teams[1], player_3.team)
 
+        self.assertEqual(player_1.current_pos, (16, 2))
+        self.assertEqual(player_1.initial_pos, (16, 2))
+        self.assertEqual(universe.bots[1].current_pos, (16, 2))
+        self.assertEqual(universe.bots[1].initial_pos, (16, 2))
+
         self.assertEqual({(0, 1): (1, 2), (0, 0): (1, 1)},
                 player_0.legal_moves)
         self.assertEqual({(0, 1): (16, 3), (0, -1): (16, 1), (0, 0): (16, 2)},
@@ -61,10 +66,19 @@ class TestAbstractPlayer(unittest.TestCase):
                 player_3.legal_moves)
 
         game_master.play_round()
+
+        self.assertEqual(player_1.current_pos, (16, 1))
+        self.assertEqual(player_1.initial_pos, (16, 2))
+        self.assertEqual(universe.bots[1].current_pos, (16, 1))
+        self.assertEqual(universe.bots[1].initial_pos, (16, 2))
+
         game_master.play_round()
+
         self.assertEqual(universe, player_1.current_uni)
-        self.assertEqual((16, 1), player_1.current_pos)
-        self.assertEqual((16, 2), player_1.previous_pos)
+        self.assertEqual(player_1.current_pos, (15, 1))
+        self.assertEqual(player_1.previous_pos, (16, 1))
+        self.assertEqual(universe.bots[1].current_pos, (15, 1))
+        self.assertEqual(universe.bots[1].initial_pos, (16, 1))
         self.assertNotEqual(player_1.current_uni, player_1.universe_states[-2])
 
 class TestTestPlayer(unittest.TestCase):

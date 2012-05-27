@@ -418,10 +418,10 @@ class ZMQPublisher(AbstractViewer):
         as_json = json_converter.dumps({"universe": universe})
         self.socket.send(as_json)
 
-    def observe(self, round_, turn, universe, events):
+    def observe(self, round_, turn, universe, game_state):
         as_json = json_converter.dumps({
             "round": round_,
             "turn": turn,
             "universe": universe,
-            "events": events})
+            "game_state": game_state})
         self.socket.send(as_json)

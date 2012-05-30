@@ -57,15 +57,12 @@ def _maze_loner(avail, orig):
                 return pos
     keys = avail.keys()
     if not keys:
-        return None
+        raise StopIteration
     return avail.keys()[0]
 
 def _maze_loners(avail, orig):
     while True:
-        loner = _maze_loner(avail, orig)
-        if not loner:
-            break
-        yield loner
+        yield _maze_loner(avail, orig)
 
 def iter_maze_by_walls(maze):
     cond = lambda items: datamodel.Wall in items

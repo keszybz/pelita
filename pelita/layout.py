@@ -34,7 +34,7 @@ def get_random_layout(filter=''):
         >>> get_random_layout(filter='without_dead_ends')
 
     """
-    layouts_names = [item for item in get_available_layouts() if filter in item]
+    layouts_names = [item for item in get_available_layouts(filter)]
     layout_choice = random.choice(layouts_names)
     return get_layout_by_name(layout_choice)
 

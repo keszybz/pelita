@@ -3,7 +3,10 @@ import glob
 import random
 
 from gi.repository import Clutter
+from gi.repository import GObject
 import cairo
+
+from pelita.ui.clutter_tools import easing_state
 
 from pelita import datamodel
 
@@ -21,6 +24,7 @@ colorBlack = Clutter.Color.new(0,0,0,255)
 
 BADDIES = glob.glob('/home/zbyszek/python/pelita/sprites/baddies/*.svg')
 
+STEP_TIME = 0.25
 
 moves_non_stop = datamodel.moves[:]
 moves_non_stop.remove(datamodel.stop)
@@ -104,11 +108,13 @@ def iter_maze_by_walls(maze):
 
 class Canvas(object):
     def __init__(self, universe):
+        self.universe = universe
+
         stage = Clutter.Stage.get_default()
         stage.set_color(colorBlack)
         stage.set_title("Pelita")
         width, height = universe.maze.width, universe.maze.height
-        stage.set_size(*self._pos_to_coord(width, height))
+        stage.set_size(*self._pos_to_coord((width, height)))
         stage.set_reactive(True)
 
         print universe.pretty
@@ -121,15 +127,16 @@ class Canvas(object):
         # Setup some key bindings on the main stage
         stage.connect_after("key-press-event", self.onKeyPress)
 
+        GObject.timeout_add(int(STEP_TIME*1000), self._move_bots)
+
         # Present the main stage (and make sure everything is shown)
         stage.show_all()
 
     pixels_per_cell = 60
 
-    def _pos_to_coord(self, col, row):
-        ans = (self.pixels_per_cell * col,
-               self.pixels_per_cell * row)
-        print (col, row), '->', ans
+    def _pos_to_coord(self, col_row):
+        ans = (self.pixels_per_cell * col_row[0],
+               self.pixels_per_cell * col_row[1])
         return ans
 
     def _create_bot(self, window, bot):
@@ -139,16 +146,28 @@ class Canvas(object):
         width, height = t.get_size()
         if width == 0 or height == 0:
             raise ValueError("failed to load image: '%s'" % filename)
-        print t.get_position()
         t.set_size(self.pixels_per_cell, self.pixels_per_cell)
-        t.set_position(*self._pos_to_coord(*bot.current_pos))
+        t.set_position(*self._pos_to_coord(bot.current_pos))
         window.add_actor(t)
-        print t.get_position()
         return t
 
     def create_bots(self, window, universe):
-        for bot in universe.bots:
-            self._create_bot(window, bot)
+        self._bot_actors = [self._create_bot(window, bot)
+                            for bot in universe.bots]
+
+    def _move_bots(self):
+        for bot in self.universe.bots:
+            legal_moves = self.universe.get_legal_moves(bot.current_pos).keys()
+            move = random.choice(legal_moves)
+            self.universe.move_bot(bot.index, move)
+            self._move_bot(bot)
+        return True
+
+    def _move_bot(self, bot):
+        actor = self._bot_actors[bot.index]
+        with easing_state(actor, duration=STEP_TIME*1000,
+                          mode=Clutter.AnimationMode.EASE_IN_QUAD):
+            actor.set_position(*self._pos_to_coord(bot.current_pos))
 
     def create_maze(self, window, universe):
         w, h = window.get_size()

@@ -24,6 +24,7 @@ colorBlack = Clutter.Color.new(0,0,0,255)
 
 
 BADDIES = glob.glob('/home/zbyszek/python/pelita/sprites/baddies/*.svg')
+WALLS = glob.glob('/home/zbyszek/python/pelita/sprites/walls/*.png')
 
 STEP_TIME = 0.25
 
@@ -172,7 +173,8 @@ class Canvas(object):
 
     def create_maze(self, window, universe):
         w, h = window.get_size()
-        maze = MazeTexture(universe.maze, width=w, height=h, auto_resize=True)
+        maze = MazeTexture(universe.maze, osd=self.osd,
+                           width=w, height=h, auto_resize=True)
         window.add_actor(maze)
         return maze
 
@@ -194,15 +196,14 @@ class Canvas(object):
         modControl = state & state.CONTROL_MASK == state.CONTROL_MASK
         modMeta = state & state.META_MASK == state.META_MASK
 
+        global STEP_TIME
         if pressed == 'q':
             print "Quitting"
             self.destroy()
         elif pressed == '-':
-            global STEP_TIME
             STEP_TIME *= 3/4
             self.osd('STEP_TIME = %f s' % STEP_TIME)
         elif pressed == '=':
-            global STEP_TIME
             STEP_TIME *= 4/3
             self.osd('STEP_TIME = %f s' % STEP_TIME)
         elif pressed == 'i':
@@ -218,9 +219,15 @@ class Canvas(object):
         print 'osd: ', message
 
 class MazeTexture(Clutter.CairoTexture):
-    def __init__(self, maze, **kwargs):
+    def __init__(self, maze, osd, **kwargs):
         super(MazeTexture, self).__init__(**kwargs)
         self.maze = maze
+
+        filename = random.choice(WALLS)
+        osd("using '%s' for wall" % filename)
+        ims = cairo.ImageSurface.create_from_png(filename)
+        self.wall_pattern = cairo.SurfacePattern(ims)
+
         self.connect('draw', self._on_draw)
         self.invalidate() # XXX: necessary?
         print maze
@@ -243,10 +250,9 @@ class MazeTexture(Clutter.CairoTexture):
         cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
         # translate to the center of the top-left cell
-        cr.set_source_rgba(0, 150, 0, 0.5)
         cr.translate(0.5, 0.5)
-
-        cr.set_source_rgba(0, 150, 0, 1)
+        # cr.set_source_rgba(0, 150, 0, 1)
+        cr.set_source(self.wall_pattern)
         self._draw_walls(cr)
 
     def _draw_walls(self, cr):

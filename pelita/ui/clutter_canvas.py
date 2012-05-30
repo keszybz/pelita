@@ -9,7 +9,7 @@ import cairo
 
 from pelita.ui.clutter_tools import easing_state
 
-from pelita import datamodel
+from pelita import datamodel, layout
 
 # An easy way to debug clutter and cogl without having to type the
 # command line arguments
@@ -267,13 +267,9 @@ class MazeTexture(Clutter.CairoTexture):
         cr.stroke()
 
 def universe_for_testing():
-    test_layout = (
-    """ ##################
-        # #.  .  # .     #
-        # #####    ##### #
-        #  0  . #  .  .#1#
-        ################## """)
-    universe = datamodel.create_CTFUniverse(test_layout, 2)
+    layout_str = layout.get_random_layout()
+    nbots = layout.number_of_bots(layout_str)
+    universe = datamodel.create_CTFUniverse(layout_str, nbots)
     return universe
 
 ################################################################################

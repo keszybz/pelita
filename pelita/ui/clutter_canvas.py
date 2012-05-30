@@ -22,37 +22,68 @@ colorBlack = Clutter.Color.new(0,0,0,255)
 BADDIES = glob.glob('/home/zbyszek/python/pelita/sprites/baddies/*.svg')
 
 
-def _chain_of_neighbours(start, avail, cond):
+moves_non_stop = datamodel.moves[:]
+moves_non_stop.remove(datamodel.stop)
+
+def _chain_of_neighbours(start, avail, orig):
     yield start
+    moves = moves_non_stop[:]
     while True:
-        for move in datamodel.moves:
+        for move in moves:
             candidate = (start[0] + move[0], start[1] + move[1])
             if candidate in avail:
                 avail.pop(candidate)
                 yield candidate
                 start = candidate
+                moves.sort(key=move.__ne__)
                 break
         else:
+            # try to join a different path if possible
+            for move in moves:
+                candidate = (start[0] + move[0], start[1] + move[1])
+                if candidate in orig:
+                    yield candidate
+                    break
             return
+
+def _maze_loner(avail, orig):
+    if (0, 0) in avail:
+        return (0, 0)
+    for pool in orig, avail:
+        for pos in avail:
+            for move in moves_non_stop:
+                candidate = (pos[0] + move[0], pos[1] + move[1])
+                if candidate in pool:
+                    break
+            else:
+                return pos
+    keys = avail.keys()
+    if not keys:
+        return None
+    return avail.keys()[0]
+
+def _maze_loners(avail, orig):
+    while True:
+        loner = _maze_loner(avail, orig)
+        if not loner:
+            break
+        yield loner
 
 def iter_maze_by_walls(maze):
     cond = lambda items: datamodel.Wall in items
     avail = dict((pos, items) for (pos, items) in maze.iteritems()
                  if cond(items))
-    start = (0, 0)
-    assert start in avail
-    while True:
+    orig = avail.copy()
+    prev_path = None
+    for start in _maze_loners(avail, orig):
         # start from the same one as long as possible
         avail.pop(start)
         while True:
-            one_path = list(_chain_of_neighbours(start, avail, cond))
-            if len(one_path) == 1:
+            one_path = list(_chain_of_neighbours(start, avail, orig))
+            if one_path == prev_path:
                 break # next starting position
             yield one_path
-        keys = avail.keys()
-        if not keys:
-            break
-        start = keys[0]
+            prev_path = one_path
 
         # for position, items in universe.maze.iteritems():
         #     model_x, model_y = position
@@ -184,9 +215,9 @@ class MazeTexture(Clutter.CairoTexture):
         cr.set_operator(cairo.OPERATOR_OVER)
 
         # who doesn't want all those nice line settings :)
-        cr.set_line_cap(cairo.LINE_CAP_SQUARE)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.set_line_width(0.3)
-        cr.set_line_join(cairo.LINE_JOIN_BEVEL)
+        cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
         # translate to the center of the top-left cell
         cr.set_source_rgba(0, 150, 0, 0.5)

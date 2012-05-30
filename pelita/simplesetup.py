@@ -93,12 +93,9 @@ class SimpleServer(object):
                  players=4, rounds=3000, host="", port=50007,
                  local=True, silent=True, dump_to_file=None):
 
-        if (layout_string and layout_name or
-                layout_string and layout_file or
-                layout_name and layout_file or
-                layout_string and layout_name and layout_file):
-            raise  ValueError("Can only supply one of: 'layout_string'"+\
-                    "'layout_name' or 'layout_file'")
+        if bool(layout_string) + bool(layout_name) + bool(layout_file) > 1:
+            raise ValueError("Can only supply one of: 'layout_string', "
+                             "'layout_name', and 'layout_file'")
         elif layout_string:
             self.layout = layout_string
         elif layout_name:

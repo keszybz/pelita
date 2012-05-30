@@ -14,6 +14,7 @@ except ImportError:
     from pelita.compat import argparse
 
 import pelita
+import pelita.ui.clutter_viewer
 
 def check_module(filepath):
     "Throws an ValueError is the specified path is neither a module nor a package."
@@ -149,6 +150,8 @@ viewer_opt.add_argument('--null', action='store_const', const='null',
                         dest='viewer', help='use the /dev/null viewer')
 viewer_opt.add_argument('--tk', action='store_const', const='tk',
                         dest='viewer', help='use the tk viewer (default)')
+viewer_opt.add_argument('--clutter', action='store_const', const='clutter',
+                        dest='viewer', help='use the clutter viewer')
 parser.set_defaults(viewer='tk')
 
 layout_opt = parser.add_mutually_exclusive_group()
@@ -252,7 +255,9 @@ def run_game(*argv):
 
     viewers = {'tk': pelita.ui.tk_viewer.TkViewer,
                'ascii': pelita.viewer.AsciiViewer,
-               'null': pelita.viewer.DevNullViewer}
+               'null': pelita.viewer.DevNullViewer,
+               'clutter': pelita.ui.clutter_viewer.Viewer,
+               }
     server.run_simple(viewers[args.viewer], geometry=args.geometry)
 
 if __name__ == '__main__':

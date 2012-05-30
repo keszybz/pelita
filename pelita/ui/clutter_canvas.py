@@ -109,13 +109,20 @@ def iter_maze_by_walls(maze):
 
 
 class Canvas(object):
-    def __init__(self, universe):
+    pixels_per_cell = 60
+
+    def __init__(self, geometry=None):
+        "Nothing to do until we have the universe"
+        self.geometry = geometry
+
+    def create(self, universe):
         self.universe = universe
 
         stage = Clutter.Stage.get_default()
         stage.set_color(colorBlack)
         stage.set_title("Pelita")
         width, height = universe.maze.width, universe.maze.height
+        # TODO: look at self.geometry
         stage.set_size(*self._pos_to_coord((width, height)))
         stage.set_reactive(True)
 
@@ -129,12 +136,8 @@ class Canvas(object):
         # Setup some key bindings on the main stage
         stage.connect_after("key-press-event", self.onKeyPress)
 
-        GObject.timeout_add(int(STEP_TIME*1000), self._move_bots)
-
         # Present the main stage (and make sure everything is shown)
         stage.show_all()
-
-    pixels_per_cell = 60
 
     def _pos_to_coord(self, col_row):
         ans = (self.pixels_per_cell * col_row[0],
@@ -157,15 +160,15 @@ class Canvas(object):
         self._bot_actors = [self._create_bot(window, bot)
                             for bot in universe.bots]
 
-    def _move_bots(self):
+    def _move_bots_random(self):
         for bot in self.universe.bots:
             legal_moves = self.universe.get_legal_moves(bot.current_pos).keys()
             move = random.choice(legal_moves)
             self.universe.move_bot(bot.index, move)
-            self._move_bot(bot)
+            self.move_bot(bot)
         return True
 
-    def _move_bot(self, bot):
+    def move_bot(self, bot):
         actor = self._bot_actors[bot.index]
         with easing_state(actor, duration=STEP_TIME*1000,
                           mode=Clutter.AnimationMode.EASE_IN_QUAD):
@@ -284,7 +287,10 @@ def main():
 
     universe = universe_for_testing()
 
-    Canvas(universe)
+    app = Canvas()
+    app.create(universe)
+    GObject.timeout_add(int(STEP_TIME*1000), app._move_bots_random)
+
     Clutter.main()
     
 if __name__ == "__main__":

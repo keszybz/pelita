@@ -1,7 +1,9 @@
 import sys
 import glob
 import random
+
 from gi.repository import Clutter
+import cairo
 
 from pelita import datamodel
 
@@ -19,70 +21,39 @@ colorBlack = Clutter.Color.new(0,0,0,255)
 
 BADDIES = glob.glob('/home/zbyszek/python/pelita/sprites/baddies/*.svg')
 
-class Canvas(object):
-    def __init__(self, universe):
-        mainStage = Clutter.Stage.get_default()
-        mainStage.set_color(colorBlack)
-        mainStage.set_title("Pelita")
-        width, height = universe.maze.width, universe.maze.height
-        mainStage.set_size(*self._pos_to_coord(width, height))
-        mainStage.set_reactive(True)
 
-        # Create a main layout manager
-        mainLayoutManager = Clutter.BoxLayout()
-        mainLayoutManager.set_vertical(True)
-        mainLayoutManager.set_homogeneous(False)
-        mainLayoutManager.set_pack_start(False)
-        
-        # Create the main window
-        # mainStage 
-        #  mainWindow :: mainLayoutManager
-        mainWindow = Clutter.Box.new(mainLayoutManager)
-        mainWindow.set_color(colorBlack)
-        mainStage.add_actor(mainWindow)
+def _chain_of_neighbours(start, avail, cond):
+    yield start
+    while True:
+        for move in datamodel.moves:
+            candidate = (start[0] + move[0], start[1] + move[1])
+            if candidate in avail:
+                avail.pop(candidate)
+                yield candidate
+                start = candidate
+                break
+        else:
+            return
 
-        # Make the main window fill the entire stage
-        mainGeometry = mainStage.get_geometry()
-        mainWindow.set_geometry(mainGeometry)
+def iter_maze_by_walls(maze):
+    cond = lambda items: datamodel.Wall in items
+    avail = dict((pos, items) for (pos, items) in maze.iteritems()
+                 if cond(items))
+    start = (0, 0)
+    assert start in avail
+    while True:
+        # start from the same one as long as possible
+        avail.pop(start)
+        while True:
+            one_path = list(_chain_of_neighbours(start, avail, cond))
+            if len(one_path) == 1:
+                break # next starting position
+            yield one_path
+        keys = avail.keys()
+        if not keys:
+            break
+        start = keys[0]
 
-        # Create a rectangle
-        self.create_maze(mainWindow, universe)
-
-        self.create_bots(mainWindow, universe)
-
-        # Setup some key bindings on the main stage
-        mainStage.connect_after("key-press-event", self.onKeyPress)
-
-        # Present the main stage (and make sure everything is shown)
-        mainStage.show_all()
-
-    pixels_per_cell = 30
-
-    def _pos_to_coord(self, col, row):
-        ans = (self.pixels_per_cell * col,
-               self.pixels_per_cell * row)
-        print (col, row), '->', ans
-        return ans
-
-    def _create_bot(self, window, bot):
-        filename = random.choice(BADDIES)
-        print 'bot', bot, 'from', filename
-        t = Clutter.Texture(filename=filename)
-        width, height = t.get_size()
-        if width == 0 or height == 0:
-            raise ValueError("failed to load image: '%s'" % filename)
-        print t.get_position()
-        t.set_size(self.pixels_per_cell, self.pixels_per_cell)
-        t.set_position(0, 0)  #*self._pos_to_coord(*bot.current_pos))
-        window.add_actor(t)
-        print t.get_position()
-        return t
-
-    def create_bots(self, window, universe):
-        for bot in universe.bots:
-            self._create_bot(window, bot)
-
-    def create_maze(self, window, universe):
         # for position, items in universe.maze.iteritems():
         #     model_x, model_y = position
         #     if datamodel.Wall in items:
@@ -103,7 +74,61 @@ class Canvas(object):
         # Clutter.Container.add_actor(window, rectangle)
         # # rectangle.show()
         # return rectangle
-        pass
+
+
+class Canvas(object):
+    def __init__(self, universe):
+        stage = Clutter.Stage.get_default()
+        stage.set_color(colorBlack)
+        stage.set_title("Pelita")
+        width, height = universe.maze.width, universe.maze.height
+        stage.set_size(*self._pos_to_coord(width, height))
+        stage.set_reactive(True)
+
+        print universe.pretty
+
+        # Create a rectangle
+        self.create_maze(stage, universe)
+
+        self.create_bots(stage, universe)
+
+        # Setup some key bindings on the main stage
+        stage.connect_after("key-press-event", self.onKeyPress)
+
+        # Present the main stage (and make sure everything is shown)
+        stage.show_all()
+
+    pixels_per_cell = 60
+
+    def _pos_to_coord(self, col, row):
+        ans = (self.pixels_per_cell * col,
+               self.pixels_per_cell * row)
+        print (col, row), '->', ans
+        return ans
+
+    def _create_bot(self, window, bot):
+        filename = random.choice(BADDIES)
+        print 'bot', bot, 'from', filename
+        t = Clutter.Texture(filename=filename)
+        width, height = t.get_size()
+        if width == 0 or height == 0:
+            raise ValueError("failed to load image: '%s'" % filename)
+        print t.get_position()
+        t.set_size(self.pixels_per_cell, self.pixels_per_cell)
+        t.set_position(*self._pos_to_coord(*bot.current_pos))
+        window.add_actor(t)
+        print t.get_position()
+        return t
+
+    def create_bots(self, window, universe):
+        for bot in universe.bots:
+            self._create_bot(window, bot)
+
+    def create_maze(self, window, universe):
+        w, h = window.get_size()
+        maze = MazeTexture(universe.maze, width=w, height=h, auto_resize=True)
+        window.add_actor(maze)
+        return maze
 
     def destroy(self):
         Clutter.main_quit()
@@ -138,6 +163,46 @@ class Canvas(object):
                 import pdb
             pdb.set_trace()
 
+class MazeTexture(Clutter.CairoTexture):
+    def __init__(self, maze, **kwargs):
+        super(MazeTexture, self).__init__(**kwargs)
+        self.maze = maze
+        self.connect('draw', self._on_draw)
+        self.invalidate() # XXX: necessary?
+        print maze
+
+    def _on_draw(self, texture, cr):
+        # Scale to surface size
+        width_, height_ = self.get_surface_size()
+        width, height = self.maze.width, self.maze.height
+        cr.scale(width_ / width, height_ / height)
+
+        # Clear our surface
+        cr.set_operator (cairo.OPERATOR_CLEAR)
+        cr.paint()
+
+        cr.set_operator(cairo.OPERATOR_OVER)
+
+        # who doesn't want all those nice line settings :)
+        cr.set_line_cap(cairo.LINE_CAP_SQUARE)
+        cr.set_line_width(0.3)
+        cr.set_line_join(cairo.LINE_JOIN_BEVEL)
+
+        # translate to the center of the top-left cell
+        cr.set_source_rgba(0, 150, 0, 0.5)
+        cr.translate(0.5, 0.5)
+
+        cr.set_source_rgba(0, 150, 0, 1)
+        self._draw_walls(cr)
+
+    def _draw_walls(self, cr):
+        for list_of_pos in iter_maze_by_walls(self.maze):
+            cr.move_to(*list_of_pos[0])
+            for pos in list_of_pos[1:]:
+                cr.line_to(*pos)
+        # cr.rectangle(0, 0, width-1, height-1)
+        cr.stroke()
+
 def universe_for_testing():
     test_layout = (
     """ ##################
@@ -159,7 +224,7 @@ def main():
 
     universe = universe_for_testing()
 
-    app = Canvas(universe)
+    Canvas(universe)
     Clutter.main()
     
 if __name__ == "__main__":

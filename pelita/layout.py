@@ -2,6 +2,8 @@
 
 """ Maze layout parsing. """
 import random
+import collections
+import operator
 
 from .containers import Mesh
 from . import __layouts
@@ -34,7 +36,7 @@ def get_random_layout(filter=''):
         >>> get_random_layout(filter='without_dead_ends')
 
     """
-    layouts_names = [item for item in get_available_layouts() if filter in item]
+    layouts_names = [item for item in get_available_layouts(filter)]
     layout_choice = random.choice(layouts_names)
     return get_layout_by_name(layout_choice)
 
@@ -266,3 +268,9 @@ class Layout(object):
             lines = file.read()
         return cls(lines, layout_chars=layout_chars, number_bots=number_bots)
 
+def number_of_bots(layout_str):
+    c = collections.Counter(layout_str)
+    counts = operator.itemgetter(*'0123456789')(c)
+    if max(counts) > 1:
+        raise ValueError('same bot index in different positions')
+    return sum(counts)

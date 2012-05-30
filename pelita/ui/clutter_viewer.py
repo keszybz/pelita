@@ -9,10 +9,16 @@ from .clutter_canvas import Canvas
 _logger = logging.getLogger('pelita.ui.clutter_viewer')
 _logger.setLevel(logging.DEBUG)
 
+def init_clutter():
+    "initialize Clutter"
+    res, argv = Clutter.init(sys.argv)
+    if res != Clutter.InitError.SUCCESS:
+        raise ValueError
+
 class Viewer(AbstractViewer):
     def __init__(self, geometry=None):
         super(Viewer, self).__init__(geometry=geometry)
-        Clutter.init(sys.argv)
+        init_clutter()
         self.canvas = Canvas(geometry=geometry)
 
     def set_initial(self, universe):

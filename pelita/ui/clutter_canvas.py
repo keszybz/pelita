@@ -47,8 +47,6 @@ def _chain_of_neighbours(start, avail, orig):
             return
 
 def _maze_loner(avail, orig):
-    if (0, 0) in avail:
-        return (0, 0)
     for pool in orig, avail:
         for pos in avail:
             for move in moves_non_stop:

@@ -1,4 +1,5 @@
 from __future__ import division
+import os
 import sys
 import glob
 import random
@@ -22,9 +23,9 @@ colorWhite = Clutter.Color.new(255,255,255,255)
 colorMuddyBlue = Clutter.Color.new(49,78,108,255)
 colorBlack = Clutter.Color.new(0,0,0,255)
 
-
-BADDIES = glob.glob('/home/zbyszek/python/pelita/sprites/baddies/*.svg')
-WALLS = glob.glob('/home/zbyszek/python/pelita/sprites/walls/*.png')
+_sprite_base = os.path.join(os.path.dirname(__file__), '..', '..', 'sprites')
+BADDIES = glob.glob(os.path.join(_sprite_base, 'baddies', '*.svg'))
+WALLS = glob.glob(os.path.join(_sprite_base, 'walls', '*.png'))
 
 STEP_TIME = 0.25
 

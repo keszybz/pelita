@@ -1,3 +1,4 @@
+from __future__ import division
 import sys
 import glob
 import random
@@ -196,10 +197,14 @@ class Canvas(object):
         if pressed == 'q':
             print "Quitting"
             self.destroy()
-        elif pressed == 'j':
-            print "Down"
-        elif pressed == 'k':
-            print "Up"
+        elif pressed == '-':
+            global STEP_TIME
+            STEP_TIME *= 3/4
+            self.osd('STEP_TIME = %f s' % STEP_TIME)
+        elif pressed == '=':
+            global STEP_TIME
+            STEP_TIME *= 4/3
+            self.osd('STEP_TIME = %f s' % STEP_TIME)
         elif pressed == 'i':
             print "Interrupt - Debug"
             try:
@@ -207,6 +212,10 @@ class Canvas(object):
             except:
                 import pdb
             pdb.set_trace()
+
+    def osd(self, message):
+        # TODO: implement osd
+        print 'osd: ', message
 
 class MazeTexture(Clutter.CairoTexture):
     def __init__(self, maze, **kwargs):

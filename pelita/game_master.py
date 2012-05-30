@@ -185,6 +185,9 @@ class GameMaster(object):
 
         self.print_possible_winner()
 
+        if self.game_state.get("finished"):
+            self.update_viewers()
+
         self.game_state["round_index"] += 1
 
     def _play_bot(self, bot):

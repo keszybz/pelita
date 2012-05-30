@@ -61,8 +61,9 @@ class TkViewer(AbstractViewer):
     app : The TkApplication class
 
     """
-    def __init__(self, address, geometry=None):
+    def __init__(self, address, controller, geometry=None):
         self.address = address
+        self.controller = controller
 
         self.geometry = geometry
 
@@ -76,7 +77,8 @@ class TkViewer(AbstractViewer):
         self.root.geometry(root_geometry+'+40+40')
 
         self.app = TkApplication(address=self.address,
-                                 geometry = self.geometry,
+                                 controller=self.controller,
+                                 geometry=self.geometry,
                                  master=self.root)
         # schedule next read
         self.root.after_idle(self.app.read_queue)

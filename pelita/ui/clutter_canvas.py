@@ -234,8 +234,6 @@ class Canvas(object):
         self.pixels_per_cell = min(stage.get_size()[0]/width,
                                    stage.get_size()[1]/height)
 
-        self.maze.invalidate()
-
     def osd(self, message):
         # TODO: implement osd
         print 'osd: ', message

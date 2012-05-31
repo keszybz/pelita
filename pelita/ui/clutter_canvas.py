@@ -243,15 +243,25 @@ class MazeTexture(Clutter.CairoTexture):
         super(MazeTexture, self).__init__(name=self.__class__.__name__,
                                           **kwargs)
         self.maze = maze
+        self.osd = osd
 
-        filename = random.choice(WALLS)
-        osd("using '%s' for wall" % filename)
-        ims = cairo.ImageSurface.create_from_png(filename)
-        self.wall_pattern = cairo.SurfacePattern(ims)
+        self.create_wall_pattern()
 
         self.connect('draw', self._on_draw)
         self.invalidate() # XXX: necessary?
         print maze
+
+    def create_wall_pattern(self):
+        try:
+            filename = random.choice(WALLS)
+            ims = cairo.ImageSurface.create_from_png(filename)
+            pattern = cairo.SurfacePattern(ims)
+            self.osd("using '%s' for wall" % filename)
+        except Exception as e:
+            self.osd("exception: %s" % e)
+            pattern = cairo.SolidPattern(0, 150, 0, 1)
+            self.osd("using solid color for wall")
+        self.wall_pattern = pattern
 
     def _on_draw(self, texture, cr):
         # Scale to surface size

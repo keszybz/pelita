@@ -151,7 +151,7 @@ class Canvas(object):
     def _create_bot(self, window, bot):
         filename = random.choice(BADDIES)
         print 'bot', bot, 'from', filename
-        t = Clutter.Texture(filename=filename)
+        t = Clutter.Texture(filename=filename, name='Bot-%d'%bot.index)
         width, height = t.get_size()
         if width == 0 or height == 0:
             raise ValueError("failed to load image: '%s'" % filename)
@@ -240,7 +240,8 @@ class Canvas(object):
 
 class MazeTexture(Clutter.CairoTexture):
     def __init__(self, maze, osd, **kwargs):
-        super(MazeTexture, self).__init__(**kwargs)
+        super(MazeTexture, self).__init__(name=self.__class__.__name__,
+                                          **kwargs)
         self.maze = maze
 
         filename = random.choice(WALLS)
@@ -253,9 +254,10 @@ class MazeTexture(Clutter.CairoTexture):
         print maze
 
     def _on_draw(self, texture, cr):
-        print 'redraw'
         # Scale to surface size
         width_, height_ = self.get_surface_size()
+        print 'redraw', (width_, height_)
+
         pixels_per_cell = min(width_/self.maze.width, height_/self.maze.height)
         cr.scale(pixels_per_cell, pixels_per_cell)
 

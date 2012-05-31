@@ -112,9 +112,10 @@ def iter_maze_by_walls(maze):
 class Canvas(object):
     pixels_per_cell = 60
 
-    def __init__(self, geometry=None):
+    def __init__(self, move_time=STEP_TIME, geometry=None):
         "Nothing to do until we have the universe"
         self.geometry = geometry
+        self.move_time = move_time
 
     def create(self, universe):
         self.universe = universe
@@ -161,17 +162,25 @@ class Canvas(object):
         self._bot_actors = [self._create_bot(window, bot)
                             for bot in universe.bots]
 
+    def create_random_movement(self):
+        self._callback_time = self.move_time
+        GObject.timeout_add(int(self._callback_time*1000),
+                            self._move_bots_random)
+
     def _move_bots_random(self):
         for bot in self.universe.bots:
             legal_moves = self.universe.get_legal_moves(bot.current_pos).keys()
             move = random.choice(legal_moves)
             self.universe.move_bot(bot.index, move)
             self.move_bot(bot)
+        if self.move_time != self._callback_time:
+            self.create_random_movement()
+            return False # kill this callback
         return True
 
     def move_bot(self, bot):
         actor = self._bot_actors[bot.index]
-        with easing_state(actor, duration=STEP_TIME*1000,
+        with easing_state(actor, duration=self.move_time*1000,
                           mode=Clutter.AnimationMode.EASE_IN_QUAD):
             actor.set_position(*self._pos_to_coord(bot.current_pos))
 
@@ -200,16 +209,15 @@ class Canvas(object):
         modControl = state & state.CONTROL_MASK == state.CONTROL_MASK
         modMeta = state & state.META_MASK == state.META_MASK
 
-        global STEP_TIME
         if pressed == 'q':
             print "Quitting"
             self.destroy()
         elif pressed == '-':
-            STEP_TIME *= 3/4
-            self.osd('STEP_TIME = %f s' % STEP_TIME)
+            self.move_time *= 3/4
+            self.osd('move_time = %f s' % self.move_time)
         elif pressed == '=':
-            STEP_TIME *= 4/3
-            self.osd('STEP_TIME = %f s' % STEP_TIME)
+            self.move_time *= 4/3
+            self.osd('move_time = %f s' % self.move_time)
         elif pressed == 'i':
             print "Interrupt - Debug"
             try:
@@ -286,7 +294,7 @@ def main():
 
     app = Canvas()
     app.create(universe)
-    GObject.timeout_add(int(STEP_TIME*1000), app._move_bots_random)
+    app.create_random_movement()
 
     Clutter.main()
     

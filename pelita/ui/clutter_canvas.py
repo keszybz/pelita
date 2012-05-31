@@ -110,21 +110,21 @@ def iter_maze_by_walls(maze):
 
 
 class Canvas(object):
-    pixels_per_cell = 60
-
     def __init__(self, move_time=STEP_TIME, geometry=None):
         "Nothing to do until we have the universe"
-        self.geometry = geometry
+        self.geometry = geometry or (900, 510)
         self.move_time = move_time
 
     def create(self, universe):
         self.universe = universe
+        width, height = universe.maze.width, universe.maze.height
+
+        geom_width, geom_height = self.geometry
+        self.pixels_per_cell = min(geom_width / width, geom_height / height)
 
         stage = Clutter.Stage.get_default()
         stage.set_color(colorBlack)
         stage.set_title("Pelita")
-        width, height = universe.maze.width, universe.maze.height
-        # TODO: look at self.geometry
         stage.set_size(*self._pos_to_coord((width, height)))
         stage.set_reactive(True)
 
@@ -245,6 +245,7 @@ class MazeTexture(Clutter.CairoTexture):
         print maze
 
     def _on_draw(self, texture, cr):
+        print 'redraw'
         # Scale to surface size
         width_, height_ = self.get_surface_size()
         width, height = self.maze.width, self.maze.height

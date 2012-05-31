@@ -125,6 +125,7 @@ class Canvas(object):
         stage = Clutter.Stage.get_default()
         stage.set_color(colorBlack)
         stage.set_title("Pelita")
+        stage.set_user_resizable(True)
         stage.set_size(*self._pos_to_coord((width, height)))
         stage.set_reactive(True)
 
@@ -136,7 +137,8 @@ class Canvas(object):
         self.create_bots(stage, universe)
 
         # Setup some key bindings on the main stage
-        stage.connect_after("key-press-event", self.onKeyPress)
+        stage.connect_after('key-press-event', self.on_key_press)
+        stage.connect_after('allocation-changed', self.on_allocation_changed)
 
         # Present the main stage (and make sure everything is shown)
         stage.show_all()
@@ -186,21 +188,20 @@ class Canvas(object):
 
     def create_maze(self, window, universe):
         w, h = window.get_size()
-        maze = MazeTexture(universe.maze, osd=self.osd,
-                           width=w, height=h, auto_resize=True)
-        window.add_actor(maze)
-        return maze
+        self.maze = MazeTexture(universe.maze, osd=self.osd,
+                                width=w, height=h, auto_resize=True)
+        window.add_actor(self.maze)
+        return self.maze
 
     def destroy(self):
         Clutter.main_quit()
 
-    def onKeyPress(self, actor=None, event=None, data=None):
+    def on_key_press(self, actor=None, event=None, data=None):
         """
         Basic key binding handler
         """
-        print self, actor, event, data
-        print dir(event)
-        print event.keyval, event.modifier_state, repr(event.unicode_value)
+        print 'on_key_press', self, actor, event, data
+        print 'key', event.keyval, event.modifier_state, repr(event.unicode_value)
         pressed = event.unicode_value
 
         # Evaluate the key modifiers
@@ -226,6 +227,15 @@ class Canvas(object):
                 import pdb
             pdb.set_trace()
 
+    def on_allocation_changed(self, stage, box, flags):
+        print 'allocation_changed', stage, box, flags
+        width, height = self.universe.maze.width, self.universe.maze.height
+
+        self.pixels_per_cell = min(stage.get_size()[0]/width,
+                                   stage.get_size()[1]/height)
+
+        self.maze.invalidate()
+
     def osd(self, message):
         # TODO: implement osd
         print 'osd: ', message
@@ -248,8 +258,8 @@ class MazeTexture(Clutter.CairoTexture):
         print 'redraw'
         # Scale to surface size
         width_, height_ = self.get_surface_size()
-        width, height = self.maze.width, self.maze.height
-        cr.scale(width_ / width, height_ / height)
+        pixels_per_cell = min(width_/self.maze.width, height_/self.maze.height)
+        cr.scale(pixels_per_cell, pixels_per_cell)
 
         # Clear our surface
         cr.set_operator (cairo.OPERATOR_CLEAR)

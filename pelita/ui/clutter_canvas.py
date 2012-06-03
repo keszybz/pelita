@@ -108,6 +108,7 @@ class Canvas(object):
         stage.set_user_resizable(True)
         stage.set_size(*self._pos_to_coord((width, height+2)))
         stage.set_reactive(True)
+        self.stage = stage
 
         print universe.pretty
 
@@ -248,6 +249,8 @@ class Canvas(object):
         if pressed == 'q':
             print "Quitting"
             self.stage.destroy()
+        elif pressed == 'f':
+            self.stage.set_fullscreen(not self.stage.get_fullscreen())
         elif pressed == '=':
             self.step_time *= 3/4
             self.osd('step_time = %f s' % self.step_time)

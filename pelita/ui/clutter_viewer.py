@@ -94,9 +94,11 @@ class Viewer(AbstractViewer):
 
     def observe(self, universe, game_state):
         print game_state
-        bot_moved = game_state.get('bot_moved', [])
-        for move in bot_moved:
+        for eaten in game_state.get('food_eaten', []):
+            self.canvas.eat_food(tuple(eaten['food_pos']))
+        for move in game_state.get('bot_moved', []):
             self.canvas.move_bot(move['bot_id'], move['new_pos'])
+        self.canvas.update_score(universe)
 
     def message(self, message):
         kwargs = json_converter.loads(message)

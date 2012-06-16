@@ -247,10 +247,10 @@ class Canvas(object):
         if pressed == 'q':
             print "Quitting"
             self.destroy()
-        elif pressed == '-':
+        elif pressed == '=':
             self.step_time *= 3/4
             self.osd('step_time = %f s' % self.step_time)
-        elif pressed == '=':
+        elif pressed == '-':
             self.step_time *= 4/3
             self.osd('step_time = %f s' % self.step_time)
         elif pressed == 'i':

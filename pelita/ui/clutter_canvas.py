@@ -113,14 +113,9 @@ class Canvas(object):
 
         print universe.pretty
 
-        # Create a rectangle
-        
         self.create_maze(stage, universe)
-        
         self.create_foods(stage, universe)
-
         self.create_bots(stage, universe)
-
         self.create_score(stage)
 
         # Setup some key bindings on the main stage
@@ -144,7 +139,7 @@ class Canvas(object):
         self.score_text = Clutter.Text.new_full(txtFont, teamname1+' '+str(score1)+':'+str(score2)+' '+teamname2, colorWhite)
         window.add_actor(self.score_text)
         self.score_resize(window)
- 
+
     def score_resize(self, window):
         size = window.get_size()
         self.score_text.set_position(size[0]/2,0)
@@ -184,7 +179,7 @@ class Canvas(object):
 
     def create_foods(self, window, universe):
         self._food_model = None
-        self._food = {pos:self._create_food(window, pos) 
+        self._food = {pos:self._create_food(window, pos)
                       for pos in universe.maze.pos_of(datamodel.Food)}
 
     def eat_food(self, food_pos):
@@ -265,7 +260,7 @@ class Canvas(object):
                                    stage.get_size()[1]/height)
 
         stage.remove_child(self.maze)
-        self.create_maze(stage, universe)        
+        self.create_maze(stage, universe)
         for pos,t in self._food.iteritems():
             pos = self._pos_to_coord(pos, offset=(0.25, 0.25))
             t.set_position(*pos)
@@ -357,6 +352,6 @@ def main():
     app.create_random_movement()
 
     Clutter.main()
-    
+
 if __name__ == "__main__":
     sys.exit(main())

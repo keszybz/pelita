@@ -290,8 +290,9 @@ class MazeTexture(Clutter.CairoTexture):
 
     def _draw_walls(self, cr):
         for list_of_pos in iter_maze_by_walls(self.maze):
+            assert len(list_of_pos) >= 1
             cr.move_to(*list_of_pos[0])
-            for pos in list_of_pos[1:]:
+            for pos in list_of_pos:
                 cr.line_to(*pos)
         # cr.rectangle(0, 0, width-1, height-1)
         cr.stroke()

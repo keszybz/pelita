@@ -114,11 +114,14 @@ class Canvas(object):
         print universe.pretty
 
         # Create a rectangle
+        
         self.create_maze(stage, universe)
         
         self.create_foods(stage, universe)
 
         self.create_bots(stage, universe)
+
+        self.create_score(stage)
 
         # Setup some key bindings on the main stage
         stage.connect_after('key-press-event', self.on_key_press)
@@ -131,6 +134,20 @@ class Canvas(object):
         ans = (self.pixels_per_cell * (col_row[0] + offset[0]),
                self.pixels_per_cell * (col_row[1] + offset[1]))
         return ans
+
+    def update_score(self, score1, score2, teamname1, teamname2):
+        self.score_text.set_text(teamname1+' '+str(score1)+':'+str(score2)+' '+teamname2)
+
+    def create_score(self, window, teamname1='Team 1', teamname2='Team 2'):
+        txtFont = "Mono 20"
+        score1 = score2 = 0
+        self.score_text = Clutter.Text.new_full(txtFont, teamname1+' '+str(score1)+':'+str(score2)+' '+teamname2, colorWhite)
+        window.add_actor(self.score_text)
+        self.score_resize(window)
+ 
+    def score_resize(self, window):
+        size = window.get_size()
+        self.score_text.set_position(size[0]/2,0)
 
     def _create_bot(self, window, bot):
         filename = random.choice(BADDIES)
@@ -252,7 +269,8 @@ class Canvas(object):
         for pos,t in self._food.iteritems():
             pos = self._pos_to_coord(pos, offset=(0.25, 0.25))
             t.set_position(*pos)
-            
+
+        self.score_resize(stage)
 
     def osd(self, message):
         # TODO: implement osd

@@ -92,10 +92,10 @@ def iter_maze_by_walls(maze):
 
 
 class Canvas(object):
-    def __init__(self, move_time=STEP_TIME, geometry=None):
+    def __init__(self, step_time=STEP_TIME, geometry=None):
         "Nothing to do until we have the universe"
         self.geometry = geometry or (900, 510)
-        self.move_time = move_time
+        self.step_time = step_time
 
     def create(self, universe):
         self.universe = universe
@@ -178,7 +178,7 @@ class Canvas(object):
                             for bot in universe.bots]
 
     def create_random_movement(self):
-        self._callback_time = self.move_time
+        self._callback_time = self.step_time
         GObject.timeout_add(int(self._callback_time*1000),
                             self._move_bots_random)
 
@@ -187,17 +187,17 @@ class Canvas(object):
             legal_moves = self.universe.get_legal_moves(bot.current_pos).keys()
             move = random.choice(legal_moves)
             self.universe.move_bot(bot.index, move)
-            self.move_bot(bot)
-        if self.move_time != self._callback_time:
+            self.move_bot(bot.index, move)
+        if self.step_time != self._callback_time:
             self.create_random_movement()
             return False # kill this callback
         return True
 
-    def move_bot(self, bot):
-        actor = self._bot_actors[bot.index]
-        with easing_state(actor, duration=self.move_time*1000,
+    def move_bot(self, bot_index, pos):
+        actor = self._bot_actors[bot_index]
+        with easing_state(actor, duration=self.step_time*1000,
                           mode=Clutter.AnimationMode.EASE_IN_QUAD):
-            actor.set_position(*self._pos_to_coord(bot.current_pos))
+            actor.set_position(*self._pos_to_coord(pos))
 
     def create_maze(self, window, universe):
         w, h = window.get_size()
@@ -227,11 +227,11 @@ class Canvas(object):
             print "Quitting"
             self.destroy()
         elif pressed == '-':
-            self.move_time *= 3/4
-            self.osd('move_time = %f s' % self.move_time)
+            self.step_time *= 3/4
+            self.osd('step_time = %f s' % self.step_time)
         elif pressed == '=':
-            self.move_time *= 4/3
-            self.osd('move_time = %f s' % self.move_time)
+            self.step_time *= 4/3
+            self.osd('step_time = %f s' % self.step_time)
         elif pressed == 'i':
             print "Interrupt - Debug"
             try:

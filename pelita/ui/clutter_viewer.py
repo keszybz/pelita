@@ -18,13 +18,6 @@ def init_clutter():
     if res != Clutter.InitError.SUCCESS:
         raise ValueError
 
-def subscribe(address):
-    ctx = zmq.Context()
-    sock = ctx.socket(zmq.SUB)
-    sock.setsockopt(zmq.SUBSCRIBE, "")
-    sock.connect(address)
-    return sock
-
 class Viewer(AbstractViewer):
     def __init__(self, address, controller_address=None, geometry=None):
         if geometry is None:
@@ -33,35 +26,100 @@ class Viewer(AbstractViewer):
         init_clutter()
 
         self.canvas = Canvas(geometry=geometry)
-        self.socket = subscribe(address)
+        self._init_zmq(address, controller_address)
+
+    def _init_zmq(self, address, controller_address):
+        context = zmq.Context()
+
+        print 'listening on', address
+        sock = context.socket(zmq.SUB)
+        sock.setsockopt(zmq.SUBSCRIBE, "")
+        sock.connect(address)
+
+        if controller_address is None:
+            self.controller_socket = None
+        else:
+            print 'dealing on', controller_address
+            csock = context.socket(zmq.DEALER)
+            csock.connect(controller_address)
+            self.controller_socket = csock
 
         self._observe_count = 0
-
-        zmq_fd = self.socket.getsockopt(zmq.FD)
+        self._initialized = False
+        zmq_fd = sock.getsockopt(zmq.FD)
         GObject.io_add_watch(zmq_fd,
                              GObject.IO_IN|GObject.IO_ERR|GObject.IO_HUP,
-                             self.zmq_callback, self.socket)
+                             self.zmq_callback, sock)
+        print 'init done'
 
     def run(self):
+        self.request_initial()
         Clutter.main()
 
+    def request_initial(self):
+        print 'request_initial:', self.controller_socket
+        if self.controller_socket:
+            # TODO: should wait for create message?
+            self.controller_socket.send_json({"__action__": "set_initial"})
+        return False # done with the callback
+
+    def request_step(self, time):
+        print 'requst_step', time
+        if self.controller_socket:
+            self.controller_socket.send_json({"__action__": "play_step"})
+        wanted = self.canvas.step_time
+        if wanted != time:
+            self.create_request_callbacks()
+            return False # kill this callback
+        return True
+
+    def create_request_callbacks(self):
+        step_time = self.canvas.step_time
+        GObject.timeout_add(int(step_time*1000), self.request_step, step_time)
+
     def zmq_callback(self, queue, condition, socket):
-        print 'zmq_callback', queue, condition, socket
+        # print 'zmq_callback', queue, condition, socket
 
         while socket.getsockopt(zmq.EVENTS) & zmq.POLLIN:
-            observed = socket.recv()
-            observed = json_converter.loads(observed)
-            self.observe(**observed)
+            message = socket.recv()
+            self.message(message)
 
         return True
 
-    # def set_initial(self, universe):
-    #     self.canvas.create(universe)
+    def set_initial(self, universe, **kwargs):
+        print 'set_initial!'
+        self.canvas.create(universe)
+        self._initialized = True
+        self.create_request_callbacks()
 
-    def observe(self, **kwargs): # round_, turn, universe, events):
+    def observe(self, universe, game_state):
+        print game_state
+        bot_moved = game_state.get('bot_moved', [])
+        for move in bot_moved:
+            self.canvas.move_bot(move['bot_id'], move['new_pos'])
+
+    def message(self, message):
+        kwargs = json_converter.loads(message)
+
         self._observe_count += 1
-        if self._observe_count == 1:
-            print "observed", self._observe_count, kwargs.keys()
+        if self._observe_count <= 2:
+            print "message", self._observe_count, kwargs.keys()
             pprint(kwargs)
-        # for bot in universe.bots:
-        #     self.canvas.move_bot(bot)
+
+        action, data = kwargs.get('__action__'), kwargs.get('__data__')
+        if action == 'set_initial':
+            func = self.set_initial
+        elif action == 'observe':
+            if self._initialized:
+                func = self.observe
+            else:
+                print 'missed set_initial, falling back to creation upon observe'
+                func = self.set_initial
+        else:
+            print "UNKOWN MESSAGE", action, data
+            return
+
+        try:
+            func(**data)
+        except Exception as e:
+            print 'error in callback:', e

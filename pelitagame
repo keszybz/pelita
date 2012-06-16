@@ -315,6 +315,9 @@ def run_game(*argv):
     else:
         publish_sock = subscribe_sock = None
 
+    process = None
+    controller_address = args.controller.replace('*', 'localhost')
+
     if args.viewer == 'ascii':
         server.game_master.register_viewer(pelita.viewer.AsciiViewer())
     if args.viewer == 'null':
@@ -323,8 +326,9 @@ def run_game(*argv):
         server.game_master.register_viewer(pelita.viewer.ProgressViewer())
     if args.viewer == 'clutter':
         code = ('from pelita.ui.clutter_viewer import Viewer\n'
-                'Viewer(%r, %r).run()' % (subscribe_sock, None))
-        subprocess.Popen(['python', '-c', code])
+                'Viewer(%r, %r).run()' % (subscribe_sock, controller_address))
+        process = subprocess.Popen(['python', '-c', code])
+        time.sleep(0.5)
 
     open_tk = args.viewer.startswith('tk')
 
@@ -333,29 +337,30 @@ def run_game(*argv):
         # Therefore we cannot use multiprocessing here. subprocess works, though.
 
         if args.viewer == 'tk':
-            sync_address_tk = args.controller.replace('*', 'localhost')
-            tk_open = "TkViewer(%r, %r).run()" % (subscribe_sock, sync_address_tk)
+            tk_open = "TkViewer(%r, %r).run()" % (subscribe_sock, controller_address)
         else:
             tk_open = "TkViewer(%r).run()" % subscribe_sock
 
-        tkprocess = subprocess.Popen(["python",
-                                      "-c",
-                                      "from pelita.ui.tk_viewer import TkViewer\n" + tk_open])
+        process = subprocess.Popen(["python",
+                                    "-c",
+                                    "from pelita.ui.tk_viewer import TkViewer\n" + tk_open])
 
         if args.viewer == 'tk-no-sync':
             time.sleep(0.5)
     try:
-        if args.viewer == 'tk':
+        if args.viewer in ('tk', 'clutter'):
+            print 'running synchronized game'
             server.register_teams()
             controller = pelita.simplesetup.SimpleController(server.game_master, args.controller)
             controller.run()
             server.exit_teams()
         else:
+            print 'running unsynchronized game'
             server.run()
     except KeyboardInterrupt:
-        if open_tk:
-            tkprocess.kill()
+        pass
 
+    process.kill()
 
 if __name__ == '__main__':
     run_game(*sys.argv[1:])

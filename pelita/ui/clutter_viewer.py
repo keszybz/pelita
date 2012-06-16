@@ -64,7 +64,13 @@ class Viewer(AbstractViewer):
         return False # done with the callback
 
     def request_step(self, time):
-        print 'requst_step', time
+        print 'requst_step', time, self.canvas.step_time, self.canvas.paused
+
+        if self.canvas.paused:
+            print 'paused'
+            self.canvas.unpauser = self.create_request_callbacks
+            return False
+
         if self.controller_socket:
             self.controller_socket.send_json({"__action__": "play_step"})
         wanted = self.canvas.step_time

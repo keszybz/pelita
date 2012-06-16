@@ -96,6 +96,8 @@ class Canvas(object):
         "Nothing to do until we have the universe"
         self.geometry = geometry or (900, 510)
         self.step_time = step_time
+        self.paused = False
+        self.unpauser = None
 
     def create(self, universe):
         self.universe = universe
@@ -253,6 +255,11 @@ class Canvas(object):
         elif pressed == '-':
             self.step_time *= 4/3
             self.osd('step_time = %f s' % self.step_time)
+        elif pressed == ' ':
+            self.paused ^= 1
+            if not self.paused and self.unpauser:
+                self.unpauser()
+            self.osd('pause/play')
         elif pressed == 'i':
             print "Interrupt - Debug"
             try:

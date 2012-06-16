@@ -122,7 +122,7 @@ class Canvas(object):
 
         # Setup some key bindings on the main stage
         stage.connect_after('key-press-event', self.on_key_press)
-        stage.connect_after('allocation-changed', self.on_allocation_changed)
+        stage.connect_after('allocation-changed', self.on_allocation_changed, universe)
 
         # Present the main stage (and make sure everything is shown)
         stage.show_all()
@@ -240,12 +240,19 @@ class Canvas(object):
                 import pdb
             pdb.set_trace()
 
-    def on_allocation_changed(self, stage, box, flags):
+    def on_allocation_changed(self, stage, box, flags, universe):
         print 'allocation_changed', stage, box, flags
         width, height = self.universe.maze.width, self.universe.maze.height
 
         self.pixels_per_cell = min(stage.get_size()[0]/width,
                                    stage.get_size()[1]/height)
+
+        stage.remove_child(self.maze)
+        self.create_maze(stage, universe)        
+        for pos,t in self._food.iteritems():
+            pos = self._pos_to_coord(pos, offset=(0.25, 0.25))
+            t.set_position(*pos)
+            
 
     def osd(self, message):
         # TODO: implement osd

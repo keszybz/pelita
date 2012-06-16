@@ -354,7 +354,10 @@ class SimpleController(object):
         # However, we cannot send any information back to them.
         # (Only one DEALER will receive the data.)
         self.socket = self.context.socket(zmq.DEALER)
-        self.socket.bind(self.address)
+        try:
+            self.socket.bind(self.address)
+        except zmq.core.error.ZMQError as e:
+            print 'error binding to address %s: %s' % (self.address, e)
 
     def run(self):
         self.on_start()
@@ -504,7 +507,10 @@ class SimplePublisher(AbstractViewer):
         self.address = address
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUB)
-        self.socket.bind(self.address)
+        try:
+            self.socket.bind(self.address)
+        except zmq.core.error.ZMQError as e:
+            print 'error binding to address %s: %s' % (self.address, e)
 
     def set_initial(self, universe):
         message = {"__action__": "set_initial",

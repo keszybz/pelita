@@ -12,6 +12,7 @@ from pelita.ui.clutter_tools import easing_state
 
 from pelita import datamodel, layout
 
+
 # An easy way to debug clutter and cogl without having to type the
 # command line arguments
 #DEBUG = True
@@ -25,6 +26,7 @@ colorBlack = Clutter.Color.new(0,0,0,255)
 
 _sprite_base = os.path.join(os.path.dirname(__file__), '..', '..', 'sprites')
 BADDIES = glob.glob(os.path.join(_sprite_base, 'baddies', '*.svg'))
+FOOD = glob.glob(os.path.join(_sprite_base, 'food', '*.svg'))
 WALLS = glob.glob(os.path.join(_sprite_base, 'walls', '*.png'))
 
 STEP_TIME = 0.25
@@ -133,6 +135,8 @@ class Canvas(object):
 
         # Create a rectangle
         self.create_maze(stage, universe)
+        
+        self.create_foods(stage, universe)
 
         self.create_bots(stage, universe)
 
@@ -159,6 +163,25 @@ class Canvas(object):
         t.set_position(*self._pos_to_coord(bot.current_pos))
         window.add_actor(t)
         return t
+
+    def _create_food(self, window, food):
+        filename = random.choice(FOOD)
+        print 'food', food, 'from', filename
+        t = Clutter.Texture(filename=filename, name='food')
+        width, height = t.get_size()
+        if width == 0 or height == 0:
+            raise ValueError("failed to load image: '%s'" % filename)
+        t.set_size(self.pixels_per_cell/2, self.pixels_per_cell/2)
+        t.set_position(*self._pos_to_coord(food))
+        window.add_actor(t)
+        return t
+
+    def eat_food(self, food_pos):
+        self._food[food_pos].hide()
+
+    def create_foods(self, window, universe):
+        self._food = {pos:self._create_food(window, pos) 
+                      for pos in universe.maze.pos_of(datamodel.Food)}
 
     def create_bots(self, window, universe):
         self._bot_actors = [self._create_bot(window, bot)

@@ -2,12 +2,12 @@
 
 """ The controller """
 
-import copy
 import random
 import sys
 import time
 from . import datamodel
 from .graph import NoPathException
+from pelita.datamodel import CTFUniverse, Bot, Food
 from .viewer import AbstractViewer
 from .graph import AdjacencyList
 
@@ -70,15 +70,17 @@ class GameMaster(object):
             "bot_moved": [],
             "food_eaten": [],
             "bot_destroyed": [],
-            "timeout_teams": [0, 0],
+            "timeout_teams": [0] * len(self.universe.teams),
             "bot_id": None,
             "round_index": None,
             "running_time": 0,
             "finished": False,
-            "team_time": [0, 0],
+            "team_time": [0] * len(self.universe.teams),
             "team_wins": None,
             "game_draw": None,
-            "game_time": game_time
+            "game_time": game_time,
+            "food_count": [0] * len(self.universe.teams),
+            "food_to_eat": [len(self.universe.enemy_food(team.index)) for team in self.universe.teams]
         }
 
     @property
@@ -117,8 +119,8 @@ class GameMaster(object):
         """ Call the 'observe' method on all registered viewers.
         """
         for viewer in self.viewers:
-            viewer.observe(self.universe.copy(),
-                           copy.deepcopy(self.game_state))
+            viewer.observe(self.universe,
+                           self.game_state)
 
     def set_initial(self):
         """ This method needs to be called before a game is started.
@@ -126,7 +128,7 @@ class GameMaster(object):
         universes and tells the PlayerTeams what team_id they have.
         """
         for team_id, team in enumerate(self.player_teams):
-            team.set_initial(team_id, self.universe.copy())
+            team.set_initial(team_id, self.universe)
 
         if len(self.player_teams) != len(self.universe.teams):
             raise IndexError(
@@ -134,7 +136,7 @@ class GameMaster(object):
                 % (len(self.player_teams), len(self.universe.teams)))
 
         for viewer in self.viewers:
-            viewer.set_initial(self.universe.copy())
+            viewer.set_initial(self.universe)
 
     # TODO the game winning detection should be refactored
     def play(self):
@@ -229,12 +231,15 @@ class GameMaster(object):
 
         player_team = self.player_teams[bot.team_index]
         try:
-            universe_copy = self.universe.copy()
             if self.noiser:
-                universe_copy = self.noiser.uniform_noise(universe_copy, bot.index)
+                universe = self.noiser.uniform_noise(self.universe, bot.index)
+            else:
+                universe = self.universe
 
             team_time_begin = time.time()
-            move = player_team.get_move(bot.index, universe_copy)
+
+            move = player_team.get_move(bot.index, universe)
+
             team_time_needed = time.time() - team_time_begin
             self.game_state["team_time"][bot.team_index] += team_time_needed
 
@@ -274,6 +279,10 @@ class GameMaster(object):
                               bot.team_index,
                               bot.index))
 
+        for food_eaten in self.game_state["food_eaten"]:
+            team_id = self.universe.bots[food_eaten["bot_id"]].team_index
+            self.game_state["food_count"][team_id] += 1
+
     def prepare_next_round(self):
         """ Increases `game_state["round_index"]`, if possible
         and resets `game_state["bot_id"]`.
@@ -302,9 +311,10 @@ class GameMaster(object):
             # clear the bot_id of the current bot
             self.game_state["bot_id"] = None
         else:
-            food_left = [self.universe.enemy_food(team.index) for team in self.universe.teams]
-            if not all(food_left):
-                self.game_state["finished"] = True
+            for to_eat, eaten in zip(self.game_state["food_to_eat"], self.game_state["food_count"]):
+                if to_eat == eaten:
+                    self.game_state["finished"] = True
+
 
     def check_winner(self):
         if not self.game_state["finished"]:
@@ -404,8 +414,9 @@ class UniverseNoiser(object):
             universe with noisy enemy positions
 
         """
-        bot = universe.bots[bot_index]
-        bots_to_noise = universe.enemy_bots(bot.team_index)
+        universe_copy = CTFUniverse(maze=universe.maze, teams=universe.teams, bots=[Bot._from_json_dict(bot._to_json_dict()) for bot in universe.bots])
+        bot = universe_copy.bots[bot_index]
+        bots_to_noise = universe_copy.enemy_bots(bot.team_index)
         for b in bots_to_noise:
             # Check that the distance between this bot and the enemy is larger
             # than `sight_distance`.
@@ -421,5 +432,5 @@ class UniverseNoiser(object):
                     self.noise_radius))
                 b.current_pos = random.choice(possible_positions)
                 b.noisy = True
-        return universe
+        return universe_copy
 

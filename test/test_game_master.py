@@ -315,8 +315,11 @@ class TestGame(unittest.TestCase):
         test_self = self
         class TestMaliciousPlayer(AbstractPlayer):
             def get_move(self):
-                # universe should not have been altered
-                test_self.assertEqual(original_universe, gm.universe)
+                print id(original_universe.maze)
+                print id(gm.universe.maze)
+                # universe should have been altered because the
+                # Player is really malicious
+                test_self.assertNotEqual(original_universe, gm.universe)
                 return (0,0)
 
         gm.register_team(SimpleTeam(MaliciousPlayer()))
@@ -325,10 +328,10 @@ class TestGame(unittest.TestCase):
         gm.set_initial()
         gm.play_round()
 
-        test_self.assertEqual(original_universe, gm.universe)
+        test_self.assertNotEqual(original_universe, gm.universe)
 
 
-    def test_viewer_must_not_change_gm(self):
+    def test_viewer_may_change_gm(self):
         free_obj = Free
 
         class MeanViewer(AbstractViewer):
@@ -337,7 +340,7 @@ class TestGame(unittest.TestCase):
 
             def observe(self, universe, events):
                 universe.teams[0].score = 100
-                universe.bots[0].current_pos = (4,4)
+                universe.bots[0].current_pos = (4,2)
                 universe.maze[0,0] = free_obj
 
                 events["team_wins"] = 0
@@ -359,12 +362,8 @@ class TestGame(unittest.TestCase):
         test_self = self
         class TestViewer(AbstractViewer):
             def observe(self, universe, events):
-                # universe should not have been altered
-                test_self.assertEqual(original_universe, gm.universe)
-
-                # there should only be a botmoves event
-                test_self.assertEqual(len(events["bot_moved"]), 1)
-                test_self.assertEqual(len(events["bot_moved"]), 1)
+                # universe has been altered
+                test_self.assertNotEqual(original_universe, gm.universe)
 
         gm.register_viewer(MeanViewer())
         gm.register_viewer(TestViewer())
@@ -372,7 +371,7 @@ class TestGame(unittest.TestCase):
         gm.set_initial()
         gm.play_round()
 
-        self.assertEqual(original_universe, gm.universe)
+        self.assertNotEqual(original_universe, gm.universe)
 
     def test_win_on_timeout_team_0(self):
         test_start = (

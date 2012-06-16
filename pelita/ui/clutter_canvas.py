@@ -35,20 +35,21 @@ moves_non_stop.remove(datamodel.stop)
 def _chain_of_neighbours(start, avail, orig):
     yield start
     moves = moves_non_stop[:]
+    prev = None
     while True:
         for move in moves:
             candidate = (start[0] + move[0], start[1] + move[1])
             if candidate in avail:
                 avail.pop(candidate)
                 yield candidate
-                start = candidate
+                prev, start = start, candidate
                 moves.sort(key=move.__ne__)
                 break
         else:
             # try to join a different path if possible
             for move in moves:
                 candidate = (start[0] + move[0], start[1] + move[1])
-                if candidate in orig:
+                if candidate in orig and candidate != prev:
                     yield candidate
                     break
             return
@@ -86,27 +87,6 @@ def iter_maze_by_walls(maze):
                 break # next starting position
             yield one_path
             prev_path = one_path
-
-        # for position, items in universe.maze.iteritems():
-        #     model_x, model_y = position
-        #     if datamodel.Wall in items:
-        #         wall_item = Wall(self.mesh_graph, model_x, model_y)
-        #         wall_item.wall_neighbours = []
-        #         for dx in [-1, 0, 1]:
-        #             for dy in [-1, 0, 1]:
-        #                 try:
-        #                     if datamodel.Wall in universe.maze[model_x + dx, model_y + dy]:
-        #                         wall_item.wall_neighbours.append( (dx, dy) )
-        #                 except IndexError:
-        #                     pass
-        #         wall_item.draw(self.canvas)
-
-
-        # rectangle = Clutter.Rectangle.new_with_color(colorMuddyBlue)
-        # rectangle.set_size(200,50)
-        # Clutter.Container.add_actor(window, rectangle)
-        # # rectangle.show()
-        # return rectangle
 
 
 class Canvas(object):

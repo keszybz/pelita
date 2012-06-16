@@ -1,10 +1,14 @@
 #!/usr/bin/env python
+
 import sys
 import os.path
 import random
 import string
 import keyword
 import logging
+import subprocess
+import time
+
 # silence stupid warnings from logging module
 logging.root.manager.emittedNoHandlerWarning = 1
 
@@ -14,7 +18,6 @@ except ImportError:
     from pelita.compat import argparse
 
 import pelita
-import pelita.ui.clutter_viewer
 
 def check_module(filepath):
     "Throws an ValueError is the specified path is neither a module nor a package."
@@ -49,12 +52,7 @@ def load_factory(filespec):
         module = __import__(modname, fromlist=[factory_name])
     return getattr(module, factory_name)
 
-PLAYERS = [name for name in dir(pelita.player)
-           if name.endswith('Player') and
-              name not in ('AbstractPlayer', 'TestPlayer',
-                           'StoppingPlayer', 'IOBoundPlayer',
-                           'CPUBoundPlayer', 'MoveExceptionPlayer',
-                           'InitialExceptionPlayer')]
+PLAYERS = pelita.player.SANE_PLAYERS
 
 def import_builtin_player(name):
     if name == 'random':
@@ -143,15 +141,28 @@ parser.add_argument('--geometry', type=geometry_string, metavar='NxM',
 parser.add_argument('--dry-run', const=True, action='store_const',
                     help='load players but do not actually play the game')
 
+publisher_opt = parser.add_mutually_exclusive_group()
+publisher_opt.add_argument('--publish', type=str, metavar='URL',
+                           dest='publish_to', help='publish to this zmq socket')
+publisher_opt.add_argument('--no-publish', const=False, action='store_const',
+                           dest='publish_to', help='do not publish')
+parser.set_defaults(publish_to="tcp://*:50011")
+
+controller_opt = parser.add_mutually_exclusive_group()
+controller_opt.add_argument('--controller', type=str, metavar='URL', default="tcp://*:50012",
+                            help='open a controller on this zmq socket')
+
 viewer_opt = parser.add_mutually_exclusive_group()
 viewer_opt.add_argument('--ascii', action='store_const', const='ascii',
                         dest='viewer', help='use the ASCII viewer')
 viewer_opt.add_argument('--null', action='store_const', const='null',
                         dest='viewer', help='use the /dev/null viewer')
+viewer_opt.add_argument('--progress', action='store_const', const='progress',
+                        dest='viewer', help='use the progress viewer')
 viewer_opt.add_argument('--tk', action='store_const', const='tk',
                         dest='viewer', help='use the tk viewer (default)')
-viewer_opt.add_argument('--clutter', action='store_const', const='clutter',
-                        dest='viewer', help='use the clutter viewer')
+viewer_opt.add_argument('--tk-no-sync', action='store_const', const='tk-no-sync',
+                        dest='viewer', help='use the unsynchronised tk viewer')
 parser.set_defaults(viewer='tk')
 
 layout_opt = parser.add_mutually_exclusive_group()
@@ -203,6 +214,14 @@ Team Specification:
 
         $ %(prog)s my_player NQRandomPlayer,BasicDefensePlayer
 
+  - Using custom players (simpleclient):
+    The address the server should bind on and wait for a client
+    to connect to.
+    Example usage:
+
+        $ %(prog)s tcp://*:9005 ipc:///tmp/mysocket
+
+
 Layout specification:
   If neither --layoutfile nor --layout are specified, the maze is
   chosen at random from the pool of available layouts.
@@ -220,6 +239,9 @@ def run_game(*argv):
         sys.exit(0)
     if args.seed is not None:
         random.seed(args.seed)
+    if args.viewer.startswith('tk') and not args.publish_to:
+        raise ValueError("Options --tk (or --tk-no-sync) and --no-publish are mutually exclusive.")
+
 
     try:
         start_logging(args.log or 'pelita.log')
@@ -232,33 +254,102 @@ def run_game(*argv):
         print '\n'.join(PLAYERS)
         sys.exit(0)
 
-    bads = load_team(args.left_team) or sys.exit(1)
-    goods = load_team(args.right_team) or sys.exit(1)
+    # check if we've been given an address which a remote
+    # player wants to connect to
+    if "://" in args.left_team:
+        addrs_left = args.left_team
+        bads = None
+    else:
+        addrs_left = "tcp://*"
+        bads = load_team(args.left_team) or sys.exit(1)
+
+    if "://" in args.right_team:
+        addrs_right = args.right_team
+        goods = None
+    else:
+        addrs_right = "tcp://*"
+        goods = load_team(args.right_team) or sys.exit(1)
 
     if args.dry_run:
         sys.exit(0)
 
     try:
+        # TODO: Re-include the dump.
         dump = args.dump or 'pelita.dump'
     except AttributeError:
         dump = None
-    
-    for team in (bads, goods):
-        client = pelita.simplesetup.SimpleClient(team)
-        client.autoplay_background()
-    server = pelita.simplesetup.SimpleServer(layout_file=args.layoutfile,
-                                             layout_name=args.layout,
-                                             layout_filter=args.filter,
-                                             rounds=args.rounds,
-                                             dump_to_file=dump
-                                             )
 
-    viewers = {'tk': pelita.ui.tk_viewer.TkViewer,
-               'ascii': pelita.viewer.AsciiViewer,
-               'null': pelita.viewer.DevNullViewer,
-               'clutter': pelita.ui.clutter_viewer.Viewer,
-               }
-    server.run_simple(viewers[args.viewer], geometry=args.geometry)
+    if args.viewer == 'tk-no-sync':
+        # only use delay when not synced.
+        initial_delay = 0.5
+    else:
+        initial_delay = 0.0
+
+    server = pelita.simplesetup.SimpleServer(layout_file=args.layoutfile,
+                                       layout_name=args.layout,
+                                       layout_filter=args.filter,
+                                       rounds=args.rounds,
+                                       bind_addrs=(addrs_left, addrs_right),
+                                       initial_delay=initial_delay
+                                       )
+
+    player_clients = []
+    for (addr, team) in zip(server.bind_addresses, [bads, goods]):
+        if team:
+            addr = addr.replace('*', 'localhost')
+            client = pelita.simplesetup.SimpleClient(team, address=addr)
+            player_clients.append(client)
+
+    for client in player_clients:
+        client.autoplay_process()
+
+    # register the viewers
+    if args.publish_to:
+        publish_sock = args.publish_to
+        subscribe_sock = publish_sock.replace('*', 'localhost')
+
+        publisher = pelita.simplesetup.SimplePublisher(publish_sock)
+        server.game_master.register_viewer(publisher)
+    else:
+        publish_sock = subscribe_sock = None
+
+    if args.viewer == 'ascii':
+        server.game_master.register_viewer(pelita.viewer.AsciiViewer())
+    if args.viewer == 'null':
+        server.game_master.register_viewer(pelita.viewer.DevNullViewer())
+    if args.viewer == 'progress':
+        server.game_master.register_viewer(pelita.viewer.ProgressViewer())
+
+    open_tk = args.viewer.startswith('tk')
+
+    if open_tk:
+        # Something on OS X prevents Tk from running in a forked process.
+        # Therefore we cannot use multiprocessing here. subprocess works, though.
+
+        if args.viewer == 'tk':
+            sync_address_tk = args.controller.replace('*', 'localhost')
+            tk_open = "TkViewer(%r, %r).run()" % (subscribe_sock, sync_address_tk)
+        else:
+            tk_open = "TkViewer(%r).run()" % subscribe_sock
+
+        tkprocess = subprocess.Popen(["python",
+                                      "-c",
+                                      "from pelita.ui.tk_viewer import TkViewer\n" + tk_open])
+
+        if args.viewer == 'tk-no-sync':
+            time.sleep(0.5)
+    try:
+        if args.viewer == 'tk':
+            server.register_teams()
+            controller = pelita.simplesetup.SimpleController(server.game_master, args.controller)
+            controller.run()
+            server.exit_teams()
+        else:
+            server.run()
+    except KeyboardInterrupt:
+        if open_tk:
+            tkprocess.kill()
+
 
 if __name__ == '__main__':
     run_game(*sys.argv[1:])

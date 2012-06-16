@@ -23,7 +23,7 @@ class TestAbstractPlayer(unittest.TestCase):
         game_master = GameMaster(test_layout, 4, 2, noise=False)
         universe = game_master.universe
         player_0 = StoppingPlayer()
-        player_1 = TestPlayer([north, west])
+        player_1 = TestPlayer('^<')
         player_2 = StoppingPlayer()
         player_3 = StoppingPlayer()
         game_master.register_team(SimpleTeam(player_0, player_2))
@@ -88,6 +88,7 @@ class TestAbstractPlayer(unittest.TestCase):
         self.assertUniversesNotEqual(player_1.current_uni,
                                      player_1.universe_states[-2])
 
+
 class TestTestPlayer(unittest.TestCase):
     def test_test_players(self):
         test_layout = (
@@ -107,11 +108,69 @@ class TestTestPlayer(unittest.TestCase):
         self.assertEqual(gm.universe.bots[3].current_pos, (10, 2))
 
         gm.play()
-        print gm.universe
         self.assertEqual(gm.universe.bots[0].current_pos, (3, 1))
         self.assertEqual(gm.universe.bots[1].current_pos, (8, 1))
         self.assertEqual(gm.universe.bots[2].current_pos, (3, 2))
         self.assertEqual(gm.universe.bots[3].current_pos, (8, 2))
+
+    def test_shorthand(self):
+        test_layout = (
+        """ ############
+            #0  .  .   #
+            #         1#
+            ############ """)
+        num_rounds = 5
+        gm = GameMaster(test_layout, 2, num_rounds)
+        gm.register_team(SimpleTeam(TestPlayer('>v<^-)')))
+        gm.register_team(SimpleTeam(TestPlayer('<^>v-)')))
+        player0_expected_positions = [(1,1), (2,1), (2,2), (1,2), (1,1)]
+        player1_expected_positions = [(10,2), (9,2), (9,1), (10,1), (10,2)]
+        gm.set_initial()
+        for i in range(num_rounds):
+            self.assertEqual(gm.universe.bots[0].current_pos,
+                player0_expected_positions[i])
+            self.assertEqual(gm.universe.bots[1].current_pos,
+                player1_expected_positions[i])
+            gm.play_round()
+
+    def test_too_many_moves(self):
+        test_layout = (
+        """ ############
+            #0  .  .  1#
+            #2        3#
+            ############ """)
+        gm = GameMaster(test_layout, 4, 3)
+        movements_0 = [east, east]
+        movements_1 = [west, west]
+        gm.register_team(SimpleTeam(TestPlayer(movements_0), TestPlayer(movements_0)))
+        gm.register_team(SimpleTeam(TestPlayer(movements_1), TestPlayer(movements_1)))
+
+        self.assertRaises(ValueError, gm.play)
+
+class TestRoundBasedPlayer(unittest.TestCase):
+    def test_round_based_players(self):
+        test_layout = (
+        """ ############
+            #0  .  .  1#
+            #2        3#
+            ############ """)
+        gm = GameMaster(test_layout, 4, 3)
+        movements_0 = [east, east]
+        movements_1_0 = {0: west, 2: west}
+        movements_1_1 = {2: west}
+        gm.register_team(SimpleTeam(RoundBasedPlayer(movements_0), RoundBasedPlayer(movements_0)))
+        gm.register_team(SimpleTeam(RoundBasedPlayer(movements_1_0), RoundBasedPlayer(movements_1_1)))
+
+        self.assertEqual(gm.universe.bots[0].current_pos, (1, 1))
+        self.assertEqual(gm.universe.bots[1].current_pos, (10, 1))
+        self.assertEqual(gm.universe.bots[2].current_pos, (1, 2))
+        self.assertEqual(gm.universe.bots[3].current_pos, (10, 2))
+
+        gm.play()
+        self.assertEqual(gm.universe.bots[0].current_pos, (3, 1))
+        self.assertEqual(gm.universe.bots[1].current_pos, (8, 1))
+        self.assertEqual(gm.universe.bots[2].current_pos, (3, 2))
+        self.assertEqual(gm.universe.bots[3].current_pos, (9, 2))
 
 class TestNQRandom_Player(unittest.TestCase):
     def test_demo_players(self):
@@ -194,8 +253,8 @@ class TestBasicDefensePlayer(unittest.TestCase):
            ############## """)
 
         game_master = GameMaster(test_layout, 4, 5, noise=False)
-        team_1 = SimpleTeam(TestPlayer([east, west, stop, stop]),
-                            TestPlayer([stop, east, west, stop]))
+        team_1 = SimpleTeam(TestPlayer('><--'),
+                            TestPlayer('-><-'))
         team_2 = SimpleTeam(BasicDefensePlayer(), BasicDefensePlayer())
 
         game_master.register_team(team_1)
@@ -275,23 +334,23 @@ class TestSimpleTeam(unittest.TestCase):
                 #### """
         )
         dummy_universe = create_CTFUniverse(layout, 2)
-        team1 = SimpleTeam(TestPlayer([north]), TestPlayer([east]))
+        team1 = SimpleTeam(TestPlayer('^'), TestPlayer('>'))
 
-        self.assertRaises(ValueError, team1._set_bot_ids, [1, 5, 10])
-        team1._set_bot_ids([1,5])
+        dummy_universe.teams[0].bots = [1, 5, 10]
+        self.assertRaises(ValueError, team1.set_initial, 0, dummy_universe)
 
-        team1._set_initial(dummy_universe)
-        self.assertEqual(team1._get_move(1, dummy_universe), north)
-        self.assertEqual(team1._get_move(5, dummy_universe), east)
-        self.assertRaises(KeyError, team1._get_move, 6, dummy_universe)
+        dummy_universe.teams[0].bots = [1, 5]
+        team1.set_initial(0, dummy_universe)
+        self.assertEqual(team1.get_move(1, dummy_universe), north)
+        self.assertEqual(team1.get_move(5, dummy_universe), east)
+        self.assertRaises(KeyError, team1.get_move, 6, dummy_universe)
 
-        team2 = SimpleTeam(TestPlayer([north]), TestPlayer([east]))
-        team2._set_bot_ids([1])
+        team2 = SimpleTeam(TestPlayer('^'), TestPlayer('>'))
 
-        team2._set_initial(dummy_universe)
-        self.assertEqual(team2._get_move(1, dummy_universe), north)
-        self.assertRaises(KeyError, team2._get_move, 0, dummy_universe)
-        self.assertRaises(KeyError, team2._get_move, 2, dummy_universe)
+        team2.set_initial(1, dummy_universe)
+        self.assertEqual(team2.get_move(1, dummy_universe), north)
+        self.assertRaises(KeyError, team2.get_move, 0, dummy_universe)
+        self.assertRaises(KeyError, team2.get_move, 2, dummy_universe)
 
 class TestAbstracts(unittest.TestCase):
     class BrokenPlayer(AbstractPlayer):

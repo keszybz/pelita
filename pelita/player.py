@@ -13,10 +13,19 @@ from .graph import AdjacencyList, NoPathException
 
 __docformat__ = "restructuredtext"
 
+SANE_PLAYERS = ['BFSPlayer',
+                'BasicDefensePlayer',
+                'NQRandomPlayer',
+                'RandomPlayer']
+
 class SimpleTeam(object):
-    """ Simple class used to register an arbitrary number of Players.
+    """ Simple class used to register an arbitrary number of (Abstract-)Players.
 
     Each Player is used to control a Bot in the Universe.
+
+    SimpleTeam transforms the `set_initial` and `get_move` messages
+    from the GameMaster into `_set_index`, `_set_initial` and `_get_move`
+    messages on the Player.
 
     Parameters
     ----------
@@ -37,28 +46,30 @@ class SimpleTeam(object):
             players = args[:]
 
         for player in players:
-            for method in ('_get_move', '_set_initial'):
+            for method in ('_set_index', '_get_move', '_set_initial'):
                 if not hasattr(player, method):
                     raise TypeError('player missing %s()' % method)
 
         self._players = players
         self._bot_players = {}
 
-    def _set_bot_ids(self, bot_ids):
-        if len(bot_ids) > len(self._players):
-            raise ValueError("Tried to set %d bot_ids with only %d Players." % (len(bot_ids), len(self._players)))
-        for bot_id, player in zip(bot_ids, self._players):
-            player._set_index(bot_id)
-            self._bot_players[bot_id] = player
-
-    def _set_initial(self, universe):
+    def set_initial(self, team_id, universe):
         # only iterate about those player which are in bot_players
         # we might have defined more players than we have received
         # indexes for.
-        for player in self._bot_players.values():
-            player._set_initial(universe)
+        team = universe.teams[team_id]
 
-    def _get_move(self, bot_idx, universe):
+        if len(team.bots) > len(self._players):
+            raise ValueError("Tried to set %d bot_ids with only %d Players." % (len(team.bots), len(self._players)))
+
+        for bot_id, player in zip(team.bots, self._players):
+            # tell the player its index
+            player._set_index(bot_id)
+            # tell the player about the initial universe
+            player._set_initial(universe)
+            self._bot_players[bot_id] = player
+
+    def get_move(self, bot_idx, universe):
         """ Requests a move from the Player who controls the Bot with index `bot_idx`.
         """
         return self._bot_players[bot_idx]._get_move(universe)
@@ -69,7 +80,7 @@ class AbstractPlayer(object):
     __metaclass__ =  abc.ABCMeta
 
     def _set_index(self, index):
-        """ Called by the GameMaster to set this Players index.
+        """ Called by SimpleTeam to set this Players index.
 
         Parameters
         ----------
@@ -80,7 +91,7 @@ class AbstractPlayer(object):
         self._index = index
 
     def _set_initial(self, universe):
-        """ Called by the GameMaster on initialisation.
+        """ Called by SimpleTeam on initialisation.
 
         Parameters
         ----------
@@ -97,7 +108,7 @@ class AbstractPlayer(object):
         pass
 
     def _get_move(self, universe):
-        """ Called by the GameMaster to obtain next move.
+        """ Called by SimpleTeam to obtain next move.
 
         This will add the universe to the list of universe_states and then call
         `self.get_move()`.
@@ -257,10 +268,8 @@ class AbstractPlayer(object):
 
 class StoppingPlayer(AbstractPlayer):
     """ A Player that just stands still. """
-
     def get_move(self):
         return datamodel.stop
-
 
 class RandomPlayer(AbstractPlayer):
     """ A player that makes moves at random. """
@@ -273,8 +282,14 @@ class TestPlayer(AbstractPlayer):
 
     Parameters
     ----------
-    moves : list of moves
-        the moves to make in reverse (stack) order
+    moves : list of moves or str of shorthand symbols
+        the moves to make in order, see notes below
+
+    Notes
+    -----
+    The ``moves`` argument can either be a list of moves, e.g. ``[west, east,
+    south, north, stop]`` or a string of shorthand symbols, where the equivalent
+    of the previous example is: ``'><v^-'``.
 
     """
 
@@ -291,7 +306,34 @@ class TestPlayer(AbstractPlayer):
         self.moves = iter(moves)
 
     def get_move(self):
-        return next(self.moves)
+        try:
+            return next(self.moves)
+        except StopIteration:
+            raise ValueError()
+
+class RoundBasedPlayer(AbstractPlayer):
+    """ A Player which makes a decision dependent on the round index
+    in a dict or list. (Or anything which responds to moves[idx].)
+
+    Parameters
+    ----------
+    moves : list or dict of moves
+        the moves to make, a move is determined by moves[round]
+    """
+    def __init__(self, moves):
+        self.moves = moves
+        self.round_index = None
+
+    def get_move(self):
+        if self.round_index is None:
+            self.round_index = 0
+        else:
+            self.round_index += 1
+
+        try:
+            return self.moves[self.round_index]
+        except (IndexError, KeyError):
+            return datamodel.stop
 
 class IOBoundPlayer(AbstractPlayer):
     """ IO Bound player that crawls the file system. """

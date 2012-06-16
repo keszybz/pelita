@@ -2,9 +2,11 @@
 
 import Tkinter
 import tkFont
-import Queue
 
 from .. import datamodel
+import time
+import zmq
+from pelita.messaging.json_convert import json_converter
 from .tk_sprites import *
 from ..utils.signal_handlers import wm_delete_window_handler
 
@@ -130,8 +132,32 @@ class UiCanvas(object):
                        foreground="black",
                        background="white",
                        justify=Tkinter.CENTER,
+                       text="PLAY/PAUSE",
+                       command=self.master.toggle_running).pack(side=Tkinter.LEFT)
+
+        Tkinter.Button(self.status,
+                       font=(None, font_size),
+                       foreground="black",
+                       background="white",
+                       justify=Tkinter.CENTER,
+                       text="STEP",
+                       command=self.master.request_step).pack(side=Tkinter.LEFT)
+
+        Tkinter.Button(self.status,
+                       font=(None, font_size),
+                       foreground="black",
+                       background="white",
+                       justify=Tkinter.CENTER,
+                       text="PLAY ROUND",
+                       command=self.master.request_round).pack(side=Tkinter.LEFT)
+
+        Tkinter.Button(self.status,
+                       font=(None, font_size),
+                       foreground="black",
+                       background="white",
+                       justify=Tkinter.CENTER,
                        text="QUIT",
-                       command=self.master.frame.quit).pack()
+                       command=self.master.quit).pack()
 
         self.canvas = Tkinter.Canvas(self.master.frame,
                                      width=self.mesh_graph.screen_width,
@@ -140,9 +166,9 @@ class UiCanvas(object):
         self.canvas.pack(fill=Tkinter.BOTH, expand=Tkinter.YES)
         self.canvas.bind('<Configure>', self.resize)
 
-    def update(self, universe, events, round=None, turn=None):
+    def update(self, universe, game_state):
         # This method is called every now and then. Either when new information
-        # about universe or events have arrived or when a resize has occurred.
+        # about universe or game_state have arrived or when a resize has occurred.
         # Whenever new universe or event data is sent, this is fine, as every
         # drawing method will know how to deal with this information.
         # However, a call due to a simple resize will not include this information.
@@ -156,6 +182,12 @@ class UiCanvas(object):
         # allows us to hide the parameters from our interface and still be able
         # to use the most recent set of parameters when there is a mere resize.
 
+        if game_state:
+            round = game_state.get("round_index")
+            turn = game_state.get("bot_id")
+        else:
+            round = None
+            turn = None
 
         if universe and not self.canvas:
             if not self.mesh_graph:
@@ -192,20 +224,25 @@ class UiCanvas(object):
             self.game_status_info = lambda: self.draw_status_info(turn, round)
         self.game_status_info()
 
-        self.draw_universe(self.current_universe)
+        self.draw_universe(self.current_universe, game_state)
 
-        if events:
-            for team_wins in events.filter_type(datamodel.TeamWins):
-                team_index = team_wins.winning_team_index
-                team_name = universe.teams[team_index].name
+        if game_state:
+            for food_eaten in game_state["food_eaten"]:
+                food_tag = Food.food_pos_tag(tuple(food_eaten["food_pos"]))
+                self.canvas.delete(food_tag)
+
+            winning_team_idx = game_state.get("team_wins")
+            if winning_team_idx is not None:
+                team_name = universe.teams[winning_team_idx].name
                 self.game_finish_overlay = lambda: self.draw_game_over(team_name)
-            for game_draw in events.filter_type(datamodel.GameDraw):
+
+            if game_state.get("game_draw"):
                 self.game_finish_overlay = lambda: self.draw_game_draw()
 
         self.game_finish_overlay()
 
 
-    def draw_universe(self, universe):
+    def draw_universe(self, universe, game_state):
         self.mesh_graph.num_x = universe.maze.width
         self.mesh_graph.num_y = universe.maze.height
 
@@ -213,7 +250,7 @@ class UiCanvas(object):
         self.draw_maze(universe)
         self.draw_food(universe)
 
-        self.draw_title(universe)
+        self.draw_title(universe, game_state)
         self.draw_bots(universe)
 
         self.size_changed = False
@@ -231,22 +268,21 @@ class UiCanvas(object):
         scale = self.mesh_graph.half_scale_x * 0.2
 
         for color, x_orig in zip(cols, (center - 3, center + 3, center)):
-            x_width = self.mesh_graph.half_scale_x // 4
+            y_top = self.mesh_graph.mesh_to_screen_y(0, 0)
+            y_bottom = self.mesh_graph.mesh_to_screen_y(self.mesh_graph.mesh_height - 1, 0)
+            self.canvas.create_line(x_orig, y_top, x_orig, y_bottom, width=scale, fill=color, tag="background")
 
-            x_prev = None
-            y_prev = None
-            for y in range((self.mesh_graph.mesh_height -1 )* 10):
-                x_real = x_orig + x_width * math.sin(y * 10)
-                y_real = self.mesh_graph.mesh_to_screen_y(y / 10.0, 0)
-                if x_prev and y_prev:
-                    self.canvas.create_line((x_prev, y_prev, x_real, y_real), width=scale, fill=color, tag="background")
-                x_prev, y_prev = x_real, y_real
-
-    def draw_title(self, universe):
+    def draw_title(self, universe, game_state):
         self.score.delete("title")
         center = self.mesh_graph.screen_width // 2
-        left_team = "%s %d " % (universe.teams[0].name, universe.teams[0].score)
-        right_team = " %d %s" % (universe.teams[1].score, universe.teams[1].name)
+
+        try:
+            team_time = game_state["team_time"]
+        except (KeyError, TypeError):
+            team_time = [0, 0]
+
+        left_team = "(%.2f secs) %s %d " % (team_time[0], universe.teams[0].name, universe.teams[0].score)
+        right_team = " %d %s (%.2f secs)" % (universe.teams[1].score, universe.teams[1].name, team_time[1])
         font_size = guess_size(left_team+':'+right_team,
                                self.mesh_graph.screen_width,
                                30,
@@ -321,6 +357,8 @@ class UiCanvas(object):
         self.size_changed = True
 
     def draw_food(self, universe):
+        if not self.size_changed:
+            return
         self.canvas.delete("food")
         for position, items in universe.maze.iteritems():
             model_x, model_y = position
@@ -355,56 +393,104 @@ class UiCanvas(object):
 
     def draw_bots(self, universe):
         for bot_idx, bot_sprite in self.bot_sprites.iteritems():
-            bot_sprite.position = universe.bots[bot_sprite.bot_idx].current_pos
-
-            bot_sprite.redraw(self.canvas, universe)
+            bot_sprite.move_to(universe.bots[bot_sprite.bot_idx].current_pos, self.canvas, universe, force=self.size_changed)
 
 
 class TkApplication(object):
-    def __init__(self, queue, geometry=None, master=None):
+    def __init__(self, master, address, controller_address=None, geometry=None):
         self.master = master
+
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.SUB)
+        self.socket.setsockopt(zmq.SUBSCRIBE, "")
+        print address, self.socket, id(self.socket)
+        self.socket.connect(address)
+        self.poll = zmq.Poller()
+        self.poll.register(self.socket, zmq.POLLIN)
+
+        if controller_address:
+            self.controller_socket = self.context.socket(zmq.DEALER)
+            self.controller_socket.connect(controller_address)
+        else:
+            self.controller_socket = None
+
         self.frame = Tkinter.Frame(self.master)
         self.master.title("Pelita")
-
-        self.queue = queue
 
         self.frame.pack(fill=Tkinter.BOTH, expand=Tkinter.YES)
 
         self.ui_canvas = UiCanvas(self, geometry=geometry)
 
-        self.master.protocol("WM_DELETE_WINDOW", wm_delete_window_handler)
+        self.running = True
 
-    def read_queue(self, event=None):
+        self.master.createcommand('exit', self.quit)
+        self.master.protocol("WM_DELETE_WINDOW", self.quit)
+
+        if self.controller_socket:
+            self.master.after_idle(self.request_initial)
+
+    def toggle_running(self):
+        self.running = not self.running
+        if self.running:
+            self.request_step()
+
+    def read_queue(self):
         try:
             # read all events.
-            # if queue is empty, try again in 50 ms
+            # if queue is empty, try again in a few ms
             # we don’t want to block here and lock
             # Tk animations
-            while True:
-                observed = self.queue.get(False)
-                self.observe(observed)
+            observed = self.socket.recv(flags=zmq.NOBLOCK)
+            observed = json_converter.loads(observed)
+            self.observe(observed)
 
-                if not event:
-                    self.master.after(1, self.read_queue)
-                return
-        except Queue.Empty:
-            self.observe({})
-            if not event:
+            if self.controller_socket:
+                self.master.after(0, self.request_next, observed)
+            else:
                 self.master.after(1, self.read_queue)
+            return
+        except zmq.core.error.ZMQError:
+            self.observe({})
+            if self.controller_socket:
+                self.master.after(2, self.request_next, {})
+            else:
+                self.master.after(2, self.read_queue)
+
+    def request_initial(self):
+        if self.controller_socket:
+            self.controller_socket.send_json({"__action__": "set_initial"})
+
+        self.master.after(500, self.request_step)
+
+    def request_next(self, observed):
+        if self.running and observed and observed.get("game_state"):
+            self.request_step()
+        self.master.after(0, self.read_queue)
+
+    def request_step(self):
+        if self.controller_socket:
+            self.controller_socket.send_json({"__action__": "play_step"})
+
+    def request_round(self):
+        if self.controller_socket:
+            self.controller_socket.send_json({"__action__": "play_round"})
 
     def observe(self, observed):
         universe = observed.get("universe")
-        events = observed.get("events")
-        round = observed.get("round")
-        turn = observed.get("turn")
+        game_state = observed.get("game_state")
 
-        self.ui_canvas.update(universe, events, round, turn)
+        self.ui_canvas.update(universe, game_state)
 
     def on_quit(self):
         """ override for things which must be done when we exit.
         """
-        pass
+        self.running = False
+        if self.controller_socket:
+            self.controller_socket.send_json({"__action__": "exit"})
+        else:
+            # force closing the window (though this might not work)
+            wm_delete_window_handler()
 
     def quit(self):
         self.on_quit()
-        Tkinter.Frame.quit(self)
+        self.frame.quit()

@@ -4,7 +4,7 @@
 
 import copy
 from .layout import Layout
-from .containers import Mesh, TypeAwareList
+from .containers import Mesh
 from .messaging.json_convert import serializable
 
 
@@ -51,7 +51,7 @@ def new_pos(position, move):
     return (pos_x, pos_y)
 
 def diff_pos(initial, target):
-    """ Return the move required to move from one pos to another.
+    """ Return the move required to move from one position to another.
 
     Will return the move required to transition from `initial` to `target`. If
     `initial` equals `target` this is `stop`. If the two are not adjacent a
@@ -303,246 +303,21 @@ class Bot(object):
             item[tupled_attr] = tuple(item[tupled_attr])
         return cls(**item)
 
-class UniverseEvent(object):
-    """ Base class for all events in a Universe. """
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def _to_json_dict(self):
-        return dict(self.__dict__)
-
-    @classmethod
-    def _from_json_dict(cls, item):
-        # Events must take care to convert tuples in their __init__ method
-        return cls(**item)
-
-@serializable
-class BotMoves(UniverseEvent):
-    """ Signifies that a bot has moved.
-
-    Parameters
-    ----------
-    bot_index : int
-        index of the bot
-
-    """
-    def __init__(self, bot_index, old_pos, new_pos):
-        self.bot_index = bot_index
-        self.old_pos = tuple(old_pos)
-        self.new_pos = tuple(new_pos)
-
-    def __repr__(self):
-        return ('BotMoves(%i, %r, %r)'
-            % (self.bot_index, self.old_pos, self.new_pos))
-
-@serializable
-class BotEats(UniverseEvent):
-    """ Signifies that a bot has eaten food.
-
-    Parameters
-    ----------
-    bot_index : int
-        index of the bot
-
-    """
-    def __init__(self, bot_index, food_pos):
-        self.bot_index = bot_index
-        self.food_pos = tuple(food_pos)
-
-    def __repr__(self):
-        return ('BotEats(%i, %r)'
-            % (self.bot_index, self.food_pos))
-
-@serializable
-class FoodEaten(UniverseEvent):
-    """ Signifies that food has been eaten.
-
-    Parameters
-    ----------
-    food_pos : tuple of (int, int)
-        position of the eaten food
-
-    """
-    def __init__(self, food_pos):
-        self.food_pos = tuple(food_pos)
-
-    def __repr__(self):
-        return 'FoodEaten(%s)' % repr(self.food_pos)
-
-@serializable
-class TeamScoreChange(UniverseEvent):
-    """ Signifies that the score of a Team has changed.
-
-    Parameters
-    ----------
-    team_index : int
-        index of the team whose score has changed
-    score_change : int
-        the change in score
-    new_score : int
-        the new score
-    """
-    def __init__(self, team_index, score_change, new_score):
-        self.team_index = team_index
-        self.score_change = score_change
-        self.new_score = new_score
-
-    def __repr__(self):
-        return ('TeamScoreChange(%i, %i, %i)' %
-            (self.team_index, self.score_change, self.new_score))
-
-@serializable
-class BotDestroyed(UniverseEvent):
-    """ Signifies that a bot has been destroyed.
-
-    Parameters
-    ----------
-    harvester_index : int
-        index of the destroyed bot
-    harvester_old_pos : tuple of (int, int)
-        the position before moving
-    harvester_new_pos : tuple of (int, int)
-        the position after moving
-    harvester_reset : tuple of (int, int)
-        the reset position of the harvester
-    destroyer_index : int
-        index of the destroying bot
-    destroyer_old_pos : tuple of (int, int)
-        the position before moving
-    destroyer_new_pos : tuple of (int, int)
-        the position after moving
-
-    """
-    def __init__(self, harvester_index, harvester_old_pos,
-            harvester_new_pos, harvester_reset,
-            destroyer_index, destroyer_old_pos, destroyer_new_pos):
-        self.harvester_index = harvester_index
-        self.harvester_old_pos = tuple(harvester_old_pos)
-        self.harvester_new_pos = tuple(harvester_new_pos)
-        self.harvester_reset = tuple(harvester_reset)
-        self.destroyer_index = destroyer_index
-        self.destroyer_old_pos = tuple(destroyer_old_pos)
-        self.destroyer_new_pos = tuple(destroyer_new_pos)
-
-    def __repr__(self):
-        return ('BotDestroyed(%i, %r, %r, %r, %i, %r, %r)'
-            % (self.harvester_index, self.harvester_old_pos,
-                self.harvester_new_pos, self.harvester_reset,
-                self.destroyer_index, self.destroyer_old_pos,
-                self.destroyer_new_pos))
-
-@serializable
-class TimeoutEvent(UniverseEvent):
-    """ Signifies that a timeout has occurred.
-
-    Parameters
-    ----------
-    team_index : int
-        index of the team which had the timeout
-
-    """
-    def __init__(self, team_index):
-        self.team_index = team_index
-
-    def __repr__(self):
-        return "TimeoutEvent(%i)" % self.team_index
-
-@serializable
-class TeamWins(UniverseEvent):
-    """ Signifies that a team has eaten all enemy food.
-
-    Parameters
-    ----------
-    winning_team_index : int
-        index of the winning team
-
-    """
-    def __init__(self, winning_team_index):
-        self.winning_team_index = winning_team_index
-
-    def __repr__(self):
-        return ("TeamWins(%i)"
-            % self.winning_team_index)
-
-@serializable
-class GameDraw(UniverseEvent):
-    """ Signifies that the game was a draw.
-    """
-    def __init__(self):
-        pass
-
-    def __repr__(self):
-        return ("GameDraw()")
-
-class MazeComponent(object):
-    """ Base class for all items inside a Maze.
-
-    This class provides basic methods for serialisation but is not
-    serialisable itself (it does not have a `_json_id`). This is to
-    ensure that all inherited objects are decorated with `@serializable`
-    and do not falsely inherit the id from this class.
-    """
-
-    def __str__(self):
-        return self.__class__.char
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__)
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def _to_json_dict(self):
-        return {}
-
-    @classmethod
-    def _from_json_dict(cls, item):
-        return cls(**item)
-
-@serializable
-class Free(MazeComponent):
-    """ Object to represent a free space. """
-
-    char = ' '
-
-    def __repr__(self):
-        return 'Free()'
-
-@serializable
-class Wall(MazeComponent):
-    """ Object to represent a wall. """
-
-    char = '#'
-
-    def __repr__(self):
-        return 'Wall()'
-
-@serializable
-class Food(MazeComponent):
-    """ Object to represent a food item. """
-
-    char = '.'
-
-    def __repr__(self):
-        return 'Food()'
+Free = ' '
+Wall = '#'
+Food = '.'
 
 maze_components = [Food, Free, Wall]
-mapped_components = dict((C.char, C) for C in maze_components)
 
 @serializable
 class Maze(Mesh):
-    """ A Mesh of strings of MazeComponent representations.
+    """ A Mesh of strings of maze component representations.
 
     This is a container class to represent a game maze. It is a two-dimensional
-    structure (Mesh) which contains a representation of MazeComponents at
-    each position. Internally this is implemented using sequences of
-    characters, i.e. strings. At each position we store the characters
-    corresponding to the maze components at this position.
-
+    structure (Mesh) which contains a representation of maze components at each
+    position. This is implemented using sequences of characters, i.e. strings.
+    At each position we store the characters corresponding to the maze
+    components at this position.
     """
 
     def __init__(self, width, height, data=None):
@@ -551,43 +326,21 @@ class Maze(Mesh):
         elif not all(isinstance(s, basestring) for s in data):
             raise TypeError("Maze keyword argument 'data' should be list of " +\
                             "strings, not: %r" % data)
+        else:
+            # sort the data items
+            data = ["".join(sorted(v)) for v in data]
         super(Maze, self).__init__(width, height, data)
 
-    def __getitem__(self, index):
-        chars = super(Maze, self).__getitem__(index)
-        return [mapped_components[char] for char in chars]
-
     def __setitem__(self, key, value):
-        chars = "".join(val.char for val in value)
-        super(Maze, self).__setitem__(key, chars)
+        super(Maze, self).__setitem__(key, "".join(sorted(value)))
 
-    def has_at(self, type_, pos):
-        """ Check if objects of a given type are present at position.
-
-        DEPRECTAED
+    def get_at(self, char, pos):
+        """ Get all objects of a given char representation at certain position.
 
         Parameters
         ----------
-        type_ : type
-            the type of objects to look for
-        pos : tuple of (int, int)
-            the position to look at
-
-        Returns
-        -------
-        object_present : boolean
-            True if objects of the given type are present and False otherwise.
-
-        """
-        return type_ in self[pos]
-
-    def get_at(self, type_, pos):
-        """ Get all objects of a given type at certain position.
-
-        Parameters
-        ----------
-        type_ : type
-            the type of objects to look for
+        char : char
+            the char representation of maze components to look for
         pos : tuple of (int, int)
             the position to look at
 
@@ -597,21 +350,21 @@ class Maze(Mesh):
             the objects at that position
 
         """
-        return [item for item in self[pos] if issubclass(item, type_)]
+        return [item for item in self[pos] if item == char]
 
-    def remove_at(self, type_, pos):
-        """ Remove all objects of a given type at a certain position.
+    def remove_at(self, char, pos):
+        """ Remove all objects of a given char representation at a certain position.
 
         Parameters
         ----------
-        type_ : type
-            the type of objects to look for
+        char : char
+            the char representation to remove from the Maze
         pos : tuple of (int, int)
             the position to look at
 
         """
-        if type_ in self[pos]:
-            self[pos] = [item for item in self[pos] if item != type_]
+        if char in self[pos]:
+            self[pos] = [item for item in self[pos] if item != char]
         else:
             raise ValueError
 
@@ -627,13 +380,13 @@ class Maze(Mesh):
         """
         return self.keys()
 
-    def pos_of(self, type_):
-        """ The indices of positions which have a MazeComponent.
+    def pos_of(self, char):
+        """ The indices of positions which have a maze component.
 
         Parameters
         ----------
-        type_ : MazeComponent class
-            the type of MazeComponent to look for
+        char : maze component char
+            the char of maze component to look for
 
         Examples
         --------
@@ -647,7 +400,7 @@ class Maze(Mesh):
         ...
 
         """
-        return [pos for pos in self.positions if self.has_at(type_, pos)]
+        return [pos for pos, val in self.iteritems() if char in val]
 
     def __repr__(self):
         return ('Maze(%i, %i, data=%r)'
@@ -670,12 +423,12 @@ def create_maze(layout_mesh):
     """
     maze = Maze(layout_mesh.width, layout_mesh.height)
     for index in maze.iterkeys():
-        if layout_mesh[index] == Wall.char:
-            maze[index] = maze[index] + [Wall]
+        if layout_mesh[index] == Wall:
+            maze[index] = maze[index] + Wall
         else:
-            maze[index] = maze[index] + [Free]
-        if layout_mesh[index] == Food.char:
-            maze[index] = maze[index] + [Food]
+            maze[index] = maze[index] + Free
+        if layout_mesh[index] == Food:
+            maze[index] = maze[index] + Food
     return maze
 
 
@@ -701,7 +454,7 @@ def extract_initial_positions(mesh, number_bots):
     for k, v in mesh.iteritems():
         if v in bot_ids:
             start[int(v)] = k
-            mesh[k] = Free.char
+            mesh[k] = Free
     return start
 
 
@@ -730,7 +483,7 @@ def create_CTFUniverse(layout_str, number_bots,
     if team_names is None:
         team_names = ["black", "white"]
 
-    layout_chars = [cls.char for cls in [Wall, Free, Food]]
+    layout_chars = maze_components
 
     if number_bots % 2 != 0:
         raise UniverseException(
@@ -800,13 +553,6 @@ class CTFUniverse(object):
         # TODO make a deepcopy here, so that we can big_bang
         self.teams = teams
         self.bots = bots
-
-    def create_win_event(self):
-        if self.teams[0].score > self.teams[1].score:
-            return TeamWins(0)
-        elif self.teams[1].score > self.teams[0].score:
-            return TeamWins(1)
-        return GameDraw()
 
     @property
     def bot_positions(self):
@@ -930,7 +676,7 @@ class CTFUniverse(object):
         else:
             border_x = team_zone[0]
         return [(border_x, y) for y in range(self.maze.shape[1]) if
-                self.maze.has_at(Free, (border_x, y))]
+                Free in self.maze[border_x, y]]
 
     def move_bot(self, bot_id, move):
         """ Move a bot in certain direction.
@@ -944,8 +690,8 @@ class CTFUniverse(object):
 
         Returns
         -------
-        events : list of UniverseEvent objects
-            the events that happened during the move
+        game_state : dict
+            the current game_state
 
         Raises
         ------
@@ -953,8 +699,10 @@ class CTFUniverse(object):
             if the move is invalid or impossible
 
         """
-        events = TypeAwareList(base_class=UniverseEvent)
         # check legality of the move
+
+        game_state = {}
+
         bot = self.bots[bot_id]
         legal_moves_dict = self.get_legal_moves(bot.current_pos)
         if move not in legal_moves_dict.keys():
@@ -962,41 +710,40 @@ class CTFUniverse(object):
                 'Illegal move from bot_id %r: %s' % (bot_id, move))
         old_pos = bot.current_pos
         new_pos = bot.current_pos = legal_moves_dict[move]
-        events.append(BotMoves(bot_id, old_pos, new_pos))
+
+        game_state["bot_moved"] = [{"bot_id": bot_id, "old_pos": old_pos, "new_pos": new_pos}]
+
         team = self.teams[bot.team_index]
         # check for food being eaten
-        if self.maze.has_at(Food, bot.current_pos) and not bot.in_own_zone:
+        game_state["food_eaten"] = []
+        if Food in self.maze[bot.current_pos] and not bot.in_own_zone:
             self.maze.remove_at(Food, bot.current_pos)
-            team._score_point()
-            events.append(BotEats(bot_id, bot.current_pos))
-            events.append(FoodEaten(bot.current_pos))
-            events.append(TeamScoreChange(team.index, 1, team.score))
+
+            game_state["food_eaten"] += [{"food_pos": bot.current_pos, "bot_id": bot_id}]
+
         # check for destruction
+        game_state["bot_destroyed"] = []
         for enemy in self.enemy_bots(bot.team_index):
             if enemy.current_pos == bot.current_pos:
                 if enemy.is_destroyer and bot.is_harvester:
-                    bot._reset()
-                    enemy_team = self.teams[enemy.team_index]
-                    enemy_team._score_points(KILLPOINTS)
-                    events.append(TeamScoreChange(enemy_team.index,
-                        KILLPOINTS, enemy_team.score))
-                    events.append(BotDestroyed(
-                        bot.index, old_pos, new_pos, bot.initial_pos,
-                        enemy.index, enemy.current_pos, enemy.current_pos))
+                    game_state["bot_destroyed"] += [{'bot_id': bot.index, 'destroyed_by': enemy.index}]
                 elif enemy.is_harvester and bot.is_destroyer:
-                    new_old_pos = enemy.current_pos
-                    enemy._reset()
-                    bot_team = self.teams[bot.team_index]
-                    bot_team._score_points(KILLPOINTS)
-                    events.append(TeamScoreChange(bot_team.index,
-                        KILLPOINTS, bot_team.score))
-                    events.append(BotDestroyed(
-                       enemy.index, new_old_pos, new_old_pos, enemy.initial_pos,
-                       bot.index, old_pos, new_pos))
-        if not self.enemy_food(team.index):
-            events.append(self.create_win_event())
+                    game_state["bot_destroyed"] += [{'bot_id': enemy.index, 'destroyed_by': bot.index}]
 
-        return events
+        # reset bots
+        for destroyed in game_state["bot_destroyed"]:
+            old_pos = bot.current_pos
+            self.bots[destroyed["bot_id"]]._reset()
+            new_pos = bot.current_pos
+            game_state["bot_moved"] += [{"bot_id": bot_id, "old_pos": old_pos, "new_pos": new_pos}]
+
+        for food_eaten in game_state["food_eaten"]:
+            self.teams[self.bots[food_eaten["bot_id"]].team_index].score += 1
+
+        for bot_destroyed in game_state["bot_destroyed"]:
+            self.teams[self.bots[bot_destroyed["destroyed_by"]].team_index].score += KILLPOINTS
+
+        return game_state
 
         # TODO:
         # check for state change
@@ -1017,9 +764,29 @@ class CTFUniverse(object):
         """
         legal_moves_dict = {}
         for move, new_pos in self.neighbourhood(position).items():
-            if self.maze.has_at(Free, new_pos):
+            if Free in self.maze[new_pos]:
                 legal_moves_dict[move] = new_pos
         return legal_moves_dict
+
+    def get_legal_moves_or_stop(self, position):
+        """ Obtain legal moves (and where they lead)
+        or just stop if impossible to move.
+
+        Parameters
+        ----------
+        position : tuple of int (x, y)
+            the position to start at
+
+        Returns
+        -------
+        legal_moves : dict mapping strings (moves) to positions (x, y)
+            the legal moves and where they would lead.
+        """
+        moves = self.get_legal_moves(position)
+
+        if len(moves) > 1:
+            del moves[stop]
+        return moves
 
     def __repr__(self):
         return ("CTFUniverse(%r, %r, %r)" %
@@ -1035,12 +802,12 @@ class CTFUniverse(object):
     def _char_mesh(self):
         char_mesh = Mesh(self.maze.width, self.maze.height)
         for pos in self.maze.positions:
-            if self.maze.has_at(Wall, pos):
-                char_mesh[pos] = Wall.char
-            elif self.maze.has_at(Food, pos):
-                char_mesh[pos] = Food.char
-            elif self.maze.has_at(Free, pos):
-                char_mesh[pos] = Free.char
+                if Wall in self.maze[pos]:
+                    char_mesh[pos] = Wall
+                elif Food in self.maze[pos]:
+                    char_mesh[pos] = Food
+                elif Free in self.maze[pos]:
+                    char_mesh[pos] = Free
         for bot in self.bots:
             # TODO what about bots on the same space?
             char_mesh[bot.current_pos] = str(bot.index)

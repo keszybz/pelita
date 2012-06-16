@@ -147,9 +147,9 @@ class Canvas(object):
         # Present the main stage (and make sure everything is shown)
         stage.show_all()
 
-    def _pos_to_coord(self, col_row):
-        ans = (self.pixels_per_cell * col_row[0],
-               self.pixels_per_cell * col_row[1])
+    def _pos_to_coord(self, col_row, offset=(0,0)):
+        ans = (self.pixels_per_cell * (col_row[0] + offset[0]),
+               self.pixels_per_cell * (col_row[1] + offset[1]))
         return ans
 
     def _create_bot(self, window, bot):
@@ -164,24 +164,34 @@ class Canvas(object):
         window.add_actor(t)
         return t
 
-    def _create_food(self, window, food):
+    def _create_food_model(self):
         filename = random.choice(FOOD)
-        print 'food', food, 'from', filename
+        print 'food from', filename
         t = Clutter.Texture(filename=filename, name='food')
         width, height = t.get_size()
         if width == 0 or height == 0:
             raise ValueError("failed to load image: '%s'" % filename)
         t.set_size(self.pixels_per_cell/2, self.pixels_per_cell/2)
-        t.set_position(*self._pos_to_coord(food))
-        window.add_actor(t)
         return t
+
+    def _create_food(self, window, pos):
+        if self._food_model is None:
+            t = self._food_model = self._create_food_model()
+        else:
+            t = Clutter.Clone(source=self._food_model)
+        pos = self._pos_to_coord(pos, offset=(0.25, 0.25))
+        t.set_position(*pos)
+        window.add_actor(t)
+        #print 'food', pos, 'from', filename
+        return t
+
+    def create_foods(self, window, universe):
+        self._food_model = None
+        self._food = {pos:self._create_food(window, pos) 
+                      for pos in universe.maze.pos_of(datamodel.Food)}
 
     def eat_food(self, food_pos):
         self._food[food_pos].hide()
-
-    def create_foods(self, window, universe):
-        self._food = {pos:self._create_food(window, pos) 
-                      for pos in universe.maze.pos_of(datamodel.Food)}
 
     def create_bots(self, window, universe):
         self._bot_actors = [self._create_bot(window, bot)

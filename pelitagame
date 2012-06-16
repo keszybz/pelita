@@ -163,6 +163,8 @@ viewer_opt.add_argument('--tk', action='store_const', const='tk',
                         dest='viewer', help='use the tk viewer (default)')
 viewer_opt.add_argument('--tk-no-sync', action='store_const', const='tk-no-sync',
                         dest='viewer', help='use the unsynchronised tk viewer')
+viewer_opt.add_argument('--clutter', action='store_const', const='clutter',
+                        dest='viewer', help='use the clutter viewer')
 parser.set_defaults(viewer='tk')
 
 layout_opt = parser.add_mutually_exclusive_group()
@@ -319,6 +321,10 @@ def run_game(*argv):
         server.game_master.register_viewer(pelita.viewer.DevNullViewer())
     if args.viewer == 'progress':
         server.game_master.register_viewer(pelita.viewer.ProgressViewer())
+    if args.viewer == 'clutter':
+        code = ('from pelita.ui.clutter_viewer import Viewer\n'
+                'Viewer(%r, %r).run()' % (subscribe_sock, None))
+        subprocess.Popen(['python', '-c', code])
 
     open_tk = args.viewer.startswith('tk')
 

@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from gi.repository import Clutter
 
 # stolen from http://git.gnome.org/browse/pyclutter/tree/introspection/Clutter.py?h=wip/introspection&id=e8d34ff25a451ca4fc62ff38e95b95726352212a
 
@@ -36,3 +37,10 @@ def easing_state(self, duration=None, mode=None, delay=None):
         self.set_easing_delay(delay)
     yield
     self.restore_easing_state()
+
+def clutter_texture(filename, **kwargs):
+        t = Clutter.Texture(filename=filename, **kwargs)
+        width, height = t.get_size()
+        if width == 0 or height == 0:
+            raise ValueError("failed to load image: '%s'" % filename)
+        return t

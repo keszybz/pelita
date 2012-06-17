@@ -8,7 +8,7 @@ from gi.repository import Clutter
 from gi.repository import GObject
 import cairo
 
-from pelita.ui.clutter_tools import easing_state
+from .clutter_tools import easing_state, clutter_texture
 
 from pelita import datamodel, layout
 
@@ -182,10 +182,7 @@ class Canvas(object):
     def _create_bot(self, window, bot):
         filename = random.choice(BADDIES)
         print 'bot', bot, 'from', filename
-        t = Clutter.Texture(filename=filename, name='Bot-%d'%bot.index)
-        width, height = t.get_size()
-        if width == 0 or height == 0:
-            raise ValueError("failed to load image: '%s'" % filename)
+        t = clutter_texture(filename, name='Bot-%d'%bot.index)
         t.set_size(self.pixels_per_cell, self.pixels_per_cell)
         t.set_position(*self._pos_to_coord(bot.current_pos))
         window.add_actor(t)
@@ -194,10 +191,7 @@ class Canvas(object):
     def _create_food_model(self):
         filename = random.choice(FOOD)
         print 'food from', filename
-        t = Clutter.Texture(filename=filename, name='food')
-        width, height = t.get_size()
-        if width == 0 or height == 0:
-            raise ValueError("failed to load image: '%s'" % filename)
+        t = clutter_texture(filename, name='food')
         t.set_size(self.pixels_per_cell/2, self.pixels_per_cell/2)
         return t
 

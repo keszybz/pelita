@@ -101,6 +101,7 @@ class Canvas(object):
         self.step_time = step_time
         self.paused = False
         self.unpauser = None
+        self.stage = Clutter.Stage()
 
     def create(self, universe):
         self.universe = universe
@@ -108,7 +109,7 @@ class Canvas(object):
 
         self.set_pixels_per_cell(self.geometry, universe)
 
-        stage = Clutter.Stage.get_default()
+        stage = self.stage
         stage.set_color(colorBlack)
         stage.set_title("Pelita")
         stage.set_user_resizable(True)
@@ -247,9 +248,6 @@ class Canvas(object):
         self.maze = maze
         return maze
 
-    def destroy(self):
-        Clutter.main_quit()
-
     def on_key_press(self, actor=None, event=None, data=None):
         """
         Basic key binding handler
@@ -266,7 +264,7 @@ class Canvas(object):
 
         if pressed == 'q':
             print "Quitting"
-            self.destroy()
+            self.stage.destroy()
         elif pressed == '=':
             self.step_time *= 3/4
             self.osd('step_time = %f s' % self.step_time)
@@ -382,6 +380,8 @@ def main():
     app = Canvas()
     app.create(universe)
     app.create_random_movement()
+
+    app.stage.connect('destroy', lambda *args: Clutter.main_quit())
 
     Clutter.main()
 

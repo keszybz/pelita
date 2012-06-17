@@ -26,7 +26,14 @@ class Viewer(AbstractViewer):
         init_clutter()
 
         self.canvas = Canvas(geometry=geometry)
+        self.canvas.stage.connect('destroy', self.destroy)
         self._init_zmq(address, controller_address)
+
+    def destroy(self, *args):
+        print 'destroy', args
+        self.controller_socket.send_json({"__action__": "exit"})
+        Clutter.main_quit()
+        sys.exit(0)
 
     def _init_zmq(self, address, controller_address):
         context = zmq.Context()

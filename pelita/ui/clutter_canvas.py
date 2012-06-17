@@ -20,9 +20,11 @@ DEBUG = False
 debugArgs = ['--clutter-debug=all', '--cogl-debug=all']
 
 # Define some standard colors to make basic color assigments easier
-colorWhite = Clutter.Color.new(255,255,255,255)
+colorWhite = Clutter.Color.new(255,205,255,200)
 colorMuddyBlue = Clutter.Color.new(49,78,108,255)
 colorBlack = Clutter.Color.new(0,0,0,255)
+colorGreenish = Clutter.Color.new(0,100,0,100)
+colorBlueish = Clutter.Color.new(0,0,100,200)
 
 _sprite_base = os.path.join(os.path.dirname(__file__), '..', '..', 'sprites')
 BADDIES = glob.glob(os.path.join(_sprite_base, 'baddies', '*.svg'))
@@ -94,6 +96,7 @@ def iter_maze_by_walls(maze):
 class Canvas(object):
     def __init__(self, step_time=STEP_TIME, geometry=None):
         "Nothing to do until we have the universe"
+        print 'geometry', geometry
         self.geometry = geometry or (900, 510)
         self.step_time = step_time
         self.paused = False
@@ -103,22 +106,44 @@ class Canvas(object):
         self.universe = universe
         width, height = universe.maze.width, universe.maze.height
 
-        geom_width, geom_height = self.geometry
-        self.pixels_per_cell = min(geom_width / width, geom_height / height)
+        self.set_pixels_per_cell(self.geometry, universe)
 
         stage = Clutter.Stage.get_default()
         stage.set_color(colorBlack)
         stage.set_title("Pelita")
         stage.set_user_resizable(True)
-        stage.set_size(*self._pos_to_coord((width, height)))
+        stage.set_size(*self._pos_to_coord((width+2, height+2)))
         stage.set_reactive(True)
 
         print universe.pretty
 
-        self.create_maze(stage, universe)
-        self.create_foods(stage, universe)
-        self.create_bots(stage, universe)
+        # Create a main layout manager
+        layoutManager = Clutter.BoxLayout()
+        layoutManager.set_vertical(True)
+        layoutManager.set_homogeneous(False)
+        layoutManager.set_pack_start(True)
+
+        # Create the main window
+        window = Clutter.Box.new(layoutManager)
+        window.set_color(colorBlueish)
+        stage.add_actor(window)
+
+        # Make the main window fill the entire stage
+        window.set_geometry(stage.get_geometry())
+
         self.create_score(stage, universe)
+
+        fixedlayout = Clutter.FixedLayout.new()
+        container = Clutter.Box.new(fixedlayout)
+        container.set_color(colorGreenish)
+        window.add_actor(container)
+
+        self.mainWindow = container
+        self.mainManager = fixedlayout
+
+        self.create_maze(container, fixedlayout, universe)
+        self.create_foods(container, universe)
+        self.create_bots(container, universe)
 
         # Setup some key bindings on the main stage
         stage.connect_after('key-press-event', self.on_key_press)
@@ -126,6 +151,11 @@ class Canvas(object):
 
         # Present the main stage (and make sure everything is shown)
         stage.show_all()
+
+    def set_pixels_per_cell(self, geometry, universe):
+        geom_width, geom_height = geometry
+        width, height = universe.maze.width, universe.maze.height
+        self.pixels_per_cell = min(geom_width / width, geom_height / height)
 
     def _pos_to_coord(self, col_row, offset=(0,0)):
         ans = (self.pixels_per_cell * (col_row[0] + offset[0]),
@@ -147,7 +177,7 @@ class Canvas(object):
         txtFont = "Mono 20"
         self.score_text = Clutter.Text.new_full(txtFont, '', colorWhite)
         self.update_score(universe)
-        self.score_resize(window)
+        # self.score_resize(window)
         window.add_actor(self.score_text)
 
     def score_resize(self, window):
@@ -222,12 +252,19 @@ class Canvas(object):
                           mode=Clutter.AnimationMode.EASE_IN_QUAD):
             actor.set_position(*self._pos_to_coord(pos))
 
-    def create_maze(self, window, universe):
-        w, h = window.get_size()
-        self.maze = MazeTexture(universe.maze, osd=self.osd,
-                                width=w, height=h, auto_resize=True)
-        window.add_actor(self.maze)
-        return self.maze
+    def create_maze(self, window, manager, universe):
+        w, h = self._pos_to_coord((universe.maze.width, universe.maze.height))
+        print 'adding maze with size', (w, h)
+        maze = MazeTexture(universe.maze, osd=self.osd,
+                           width=w, height=h, auto_resize=True,
+                           coord_conv=self._pos_to_coord)
+        window.add_actor(maze)
+        # maze.set_position(30, 30)
+        maze.set_background_color(colorGreenish)
+        #manager.set_alignment(maze, Clutter.BoxAlignment.CENTER)
+        #manager.set_expand(maze, True)
+        self.maze = maze
+        return maze
 
     def destroy(self):
         Clutter.main_quit()
@@ -272,33 +309,33 @@ class Canvas(object):
         print 'allocation_changed', stage, box, flags
         width, height = self.universe.maze.width, self.universe.maze.height
 
-        self.pixels_per_cell = min(stage.get_size()[0]/width,
-                                   stage.get_size()[1]/height)
+        self.set_pixels_per_cell(stage.get_size(), universe)
 
-        stage.remove_child(self.maze)
-        self.create_maze(stage, universe)
+        # self.mainWindow.remove_child(self.maze)
+        # self.create_maze(self.mainWindow, self.mainManager, universe)
         for pos,t in self._food.iteritems():
             pos = self._pos_to_coord(pos, offset=(0.25, 0.25))
             t.set_position(*pos)
 
-        self.score_resize(stage)
+        # self.score_resize(stage)
 
     def osd(self, message):
         # TODO: implement osd
         print 'osd: ', message
 
 class MazeTexture(Clutter.CairoTexture):
-    def __init__(self, maze, osd, **kwargs):
+    def __init__(self, maze, osd, coord_conv, **kwargs):
         super(MazeTexture, self).__init__(name=self.__class__.__name__,
                                           **kwargs)
         self.maze = maze
         self.osd = osd
 
         self.create_wall_pattern()
+        self.coord_conv = coord_conv
 
         self.connect('draw', self._on_draw)
         self.invalidate() # XXX: necessary?
-        print maze
+        print 'maze is ready'
 
     def create_wall_pattern(self):
         try:
@@ -317,8 +354,7 @@ class MazeTexture(Clutter.CairoTexture):
         width_, height_ = self.get_surface_size()
         print 'redraw', (width_, height_)
 
-        pixels_per_cell = min(width_/self.maze.width, height_/self.maze.height)
-        cr.scale(pixels_per_cell, pixels_per_cell)
+        # cr.scale(1.0, 1.0)
 
         # Clear our surface
         cr.set_operator (cairo.OPERATOR_CLEAR)
@@ -328,11 +364,9 @@ class MazeTexture(Clutter.CairoTexture):
 
         # who doesn't want all those nice line settings :)
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.set_line_width(0.3)
+        cr.set_line_width(10)
         cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
-        # translate to the center of the top-left cell
-        cr.translate(0.5, 0.5)
         # cr.set_source_rgba(0, 150, 0, 1)
         cr.set_source(self.wall_pattern)
         self._draw_walls(cr)
@@ -340,10 +374,11 @@ class MazeTexture(Clutter.CairoTexture):
     def _draw_walls(self, cr):
         for list_of_pos in iter_maze_by_walls(self.maze):
             assert len(list_of_pos) >= 1
-            cr.move_to(*list_of_pos[0])
+            coord = self.coord_conv(list_of_pos[0], offset=(0.5, 0.5))
+            print 'starting wall in', coord
+            cr.move_to(*coord)
             for pos in list_of_pos:
-                cr.line_to(*pos)
-        # cr.rectangle(0, 0, width-1, height-1)
+                cr.line_to(*self.coord_conv(pos, offset=(0.5, 0.5)))
         cr.stroke()
 
 def universe_for_testing():

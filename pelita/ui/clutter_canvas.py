@@ -207,7 +207,11 @@ class Canvas(object):
                       for pos in universe.maze.pos_of(datamodel.Food)}
 
     def eat_food(self, food_pos):
-        self._food[food_pos].hide()
+        food_piece = self._food[food_pos]
+        with easing_state(food_piece, delay=self.step_time*200, duration=self.step_time*500,
+                          mode=Clutter.AnimationMode.EASE_IN_QUAD):
+            food_piece.set_size(0, 0)
+            #food_piece.hide()
 
     def create_bots(self, window, universe):
         self._bot_actors = [self._create_bot(window, bot)

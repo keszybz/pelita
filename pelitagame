@@ -134,7 +134,7 @@ parser.add_argument('--dump', help='print game dumps to'
                     metavar='DUMPFILE', default=argparse.SUPPRESS, nargs='?')
 parser.add_argument('--rounds', type=int, default=300,
                     help='maximum number of rounds to play')
-parser.add_argument('--seed', type=int, metavar='SEED', default=None, 
+parser.add_argument('--seed', type=int, metavar='SEED', default=None,
                     help='fix random seed')
 parser.add_argument('--geometry', type=geometry_string, metavar='NxM',
                     help='initial size of the game window')
@@ -281,11 +281,12 @@ def run_game(*argv):
     except AttributeError:
         dump = None
 
-    if args.viewer == 'tk-no-sync':
+    if '-no-sync' in args.viewer:
         # only use delay when not synced.
         initial_delay = 0.5
     else:
         initial_delay = 0.0
+    initial_delay = 0.5
 
     server = pelita.simplesetup.SimpleServer(layout_file=args.layoutfile,
                                        layout_name=args.layout,
@@ -326,7 +327,8 @@ def run_game(*argv):
         server.game_master.register_viewer(pelita.viewer.ProgressViewer())
     if args.viewer == 'clutter':
         code = ('from pelita.ui.clutter_viewer import Viewer\n'
-                'Viewer(%r, %r).run()' % (subscribe_sock, controller_address))
+                'Viewer(%r, %r, geometry=%r).run()' % (
+                subscribe_sock, controller_address, args.geometry))
         process = subprocess.Popen(['python', '-c', code])
         time.sleep(0.5)
 

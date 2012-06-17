@@ -64,7 +64,7 @@ class Viewer(AbstractViewer):
         return False # done with the callback
 
     def request_step(self, time):
-        print 'requst_step', time, self.canvas.step_time, self.canvas.paused
+        # print 'requst_step', time, self.canvas.step_time, self.canvas.paused
 
         if self.canvas.paused:
             print 'paused'
@@ -99,7 +99,7 @@ class Viewer(AbstractViewer):
         self.create_request_callbacks()
 
     def observe(self, universe, game_state):
-        print game_state
+        # print game_state
         for eaten in game_state.get('food_eaten', []):
             self.canvas.eat_food(tuple(eaten['food_pos']))
         for move in game_state.get('bot_moved', []):
@@ -110,7 +110,7 @@ class Viewer(AbstractViewer):
         kwargs = json_converter.loads(message)
 
         self._observe_count += 1
-        if self._observe_count <= 2:
+        if self._observe_count <= 0:
             print "message", self._observe_count, kwargs.keys()
             pprint(kwargs)
 

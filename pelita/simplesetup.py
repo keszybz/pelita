@@ -29,6 +29,7 @@ import time
 import logging
 import multiprocessing
 import threading
+import sys
 
 import uuid
 import zmq
@@ -43,7 +44,14 @@ _logger = logging.getLogger("pelita.simplesetup")
 
 __docformat__ = "restructuredtext"
 
-TIMEOUT = 3
+def bind_socket(socket, address, option_hint=None):
+    try:
+        socket.bind(address)
+    except zmq.core.error.ZMQError as e:
+        print >>sys.stderr, 'error binding to address %s: %s' % (address, e)
+        print >>sys.stderr, 'use %s <address> to specify a different port' %\
+            (option_hint,)
+        raise
 
 class UnknownMessageId(Exception):
     """ Is raised when a reply arrives with unexpected id.
@@ -169,20 +177,22 @@ class RemoteTeamPlayer(object):
         self.zmqconnection.send("team_name", {})
         return self.zmqconnection.recv()
 
-    def set_initial(self, team_id, universe):
+    def set_initial(self, team_id, universe, game_state):
         self.zmqconnection.send("set_initial", {"team_id": team_id,
-                                                "universe": universe})
+                                                "universe": universe,
+                                                "game_state": game_state})
         return self.zmqconnection.recv()
         #try:
         #    return self.ref.query("set_initial", [universe]).get(TIMEOUT)
         #except (Queue.Empty, ActorNotRunning, DeadConnection):
         #    pass
 
-    def get_move(self, bot_id, universe):
+    def get_move(self, bot_id, universe, game_state):
         try:
             self.zmqconnection.send("get_move", {"bot_id": bot_id,
-                                                 "universe": universe})
-            reply = self.zmqconnection.recv_timeout(TIMEOUT)
+                                                 "universe": universe,
+                                                 "game_state": game_state})
+            reply = self.zmqconnection.recv_timeout(game_state["timeout_length"])
             return tuple(reply)
         except ZMQTimeout:
             # answer did not arrive in time
@@ -240,7 +250,7 @@ class SimpleServer(object):
     def __init__(self, layout_string=None, layout_name=None, layout_file=None,
                  layout_filter='normal_without_dead_ends',
                  teams=2, players=4, rounds=3000, bind_addrs="tcp://*",
-                 initial_delay=0.0):
+                 initial_delay=0.0, max_timeouts=5, timeout_length=3):
 
         if (layout_string and layout_name or
             layout_string and layout_file or
@@ -262,7 +272,7 @@ class SimpleServer(object):
         self.number_of_teams = teams
         self.rounds = rounds
 
-        self.game_master = GameMaster(self.layout, self.players, self.rounds, initial_delay=initial_delay)
+        self.game_master = GameMaster(self.layout, self.players, self.rounds, initial_delay=initial_delay, max_timeouts=max_timeouts, timeout_length=timeout_length)
 
         if isinstance(bind_addrs, tuple):
             pass
@@ -354,10 +364,7 @@ class SimpleController(object):
         # However, we cannot send any information back to them.
         # (Only one DEALER will receive the data.)
         self.socket = self.context.socket(zmq.DEALER)
-        try:
-            self.socket.bind(self.address)
-        except zmq.core.error.ZMQError as e:
-            print 'error binding to address %s: %s' % (self.address, e)
+        bind_socket(self.socket, self.address, '--controller')
 
     def run(self):
         self.on_start()
@@ -507,10 +514,7 @@ class SimplePublisher(AbstractViewer):
         self.address = address
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUB)
-        try:
-            self.socket.bind(self.address)
-        except zmq.core.error.ZMQError as e:
-            print 'error binding to address %s: %s' % (self.address, e)
+        bind_socket(self.socket, self.address, '--publish')
 
     def set_initial(self, universe):
         message = {"__action__": "set_initial",

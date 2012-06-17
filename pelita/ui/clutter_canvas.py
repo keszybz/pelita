@@ -1,23 +1,13 @@
 from __future__ import division
 import os
-import sys
 import glob
 import random
 
 from gi.repository import Clutter
-from gi.repository import GObject
 import cairo
 
 from .clutter_tools import easing_state, clutter_texture
-
-from pelita import datamodel, layout
-
-
-# An easy way to debug clutter and cogl without having to type the
-# command line arguments
-#DEBUG = True
-DEBUG = False
-debugArgs = ['--clutter-debug=all', '--cogl-debug=all']
+from .. import datamodel
 
 # Define some standard colors to make basic color assigments easier
 colorWhite = Clutter.Color.new(255,205,255,200)
@@ -221,22 +211,6 @@ class Canvas(object):
             self._bot_actors.append(self._create_bot(window, bot))
             self.move_bot(bot.index, bot.current_pos)
 
-    def create_random_movement(self):
-        self._callback_time = self.step_time
-        GObject.timeout_add(int(self._callback_time*1000),
-                            self._move_bots_random)
-
-    def _move_bots_random(self):
-        for bot in self.universe.bots:
-            legal_moves = self.universe.get_legal_moves(bot.current_pos).keys()
-            move = random.choice(legal_moves)
-            self.universe.move_bot(bot.index, move)
-            self.move_bot(bot.index, move)
-        if self.step_time != self._callback_time:
-            self.create_random_movement()
-            return False # kill this callback
-        return True
-
     def move_bot(self, bot_index, pos):
         actor = self._bot_actors[bot_index]
         self._bot_positions[bot_index] = pos
@@ -373,31 +347,3 @@ class MazeTexture(Clutter.CairoTexture):
             for pos in list_of_pos:
                 cr.line_to(*self.coord_conv(pos, offset=(0.5, 0.5)))
         cr.stroke()
-
-def universe_for_testing():
-    layout_str = layout.get_random_layout()
-    nbots = layout.number_of_bots(layout_str)
-    universe = datamodel.create_CTFUniverse(layout_str, nbots)
-    return universe
-
-################################################################################
-# Main
-################################################################################
-def main():
-    if DEBUG:
-        Clutter.init(debugArgs)
-    else:
-        Clutter.init(sys.argv)
-
-    universe = universe_for_testing()
-
-    app = Canvas()
-    app.create(universe)
-    app.create_random_movement()
-
-    app.stage.connect('destroy', lambda *args: Clutter.main_quit())
-
-    Clutter.main()
-
-if __name__ == "__main__":
-    sys.exit(main())

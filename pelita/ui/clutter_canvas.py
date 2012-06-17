@@ -171,13 +171,7 @@ class Canvas(object):
         txtFont = "Mono 20"
         self.score_text = Clutter.Text.new_full(txtFont, '', colorWhite)
         self.update_score(universe)
-        # self.score_resize(window)
         window.add_actor(self.score_text)
-
-    def score_resize(self, window):
-        size = window.get_width()
-        size2 = self.score_text.get_width()
-        self.score_text.set_position((size - size2)/2, 0)
 
     def _create_bot(self, window, bot):
         filename = random.choice(BADDIES)

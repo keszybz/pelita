@@ -103,6 +103,9 @@ class Canvas(object):
         self.unpauser = None
         self.stage = Clutter.Stage()
 
+        self._bot_actors = []
+        self._bot_positions = []
+
     def create(self, universe):
         self.universe = universe
         width, height = universe.maze.width, universe.maze.height
@@ -179,7 +182,6 @@ class Canvas(object):
         print 'bot', bot, 'from', filename
         t = clutter_texture(filename, name='Bot-%d'%bot.index)
         t.set_size(self.pixels_per_cell, self.pixels_per_cell)
-        t.set_position(*self._pos_to_coord(bot.current_pos))
         window.add_actor(t)
         return t
 
@@ -214,8 +216,10 @@ class Canvas(object):
             #food_piece.hide()
 
     def create_bots(self, window, universe):
-        self._bot_actors = [self._create_bot(window, bot)
-                            for bot in universe.bots]
+        for bot in universe.bots:
+            self._bot_positions.append(None)
+            self._bot_actors.append(self._create_bot(window, bot))
+            self.move_bot(bot.index, bot.current_pos)
 
     def create_random_movement(self):
         self._callback_time = self.step_time
@@ -235,6 +239,7 @@ class Canvas(object):
 
     def move_bot(self, bot_index, pos):
         actor = self._bot_actors[bot_index]
+        self._bot_positions[bot_index] = pos
         with easing_state(actor, duration=self.step_time*1000,
                           mode=Clutter.AnimationMode.EASE_IN_QUAD):
             actor.set_position(*self._pos_to_coord(pos))
@@ -299,6 +304,11 @@ class Canvas(object):
         for pos,t in self._food.iteritems():
             pos = self._pos_to_coord(pos, offset=(0.25, 0.25))
             t.set_position(*pos)
+
+        for bot, actor in zip(universe.bots, self._bot_actors):
+            pos = self._pos_to_coord(bot.current_pos)
+            actor.set_size(self.pixels_per_cell, self.pixels_per_cell)
+            actor.set_position(*pos)
 
         # self.score_resize(stage)
 

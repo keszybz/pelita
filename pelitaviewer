@@ -12,10 +12,8 @@ from pelita.messaging.json_convert import json_converter
 
 import zmq
 
-try:
-    import argparse
-except ImportError:
-    from pelita.compat import argparse
+import argparse
+
 parser = argparse.ArgumentParser(description='Show a dumped pelita game',
                                  add_help=False,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
